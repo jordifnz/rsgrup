@@ -10,14 +10,19 @@ Disallow: /descargar-pdf/
 Disallow: /descargar-titulo
 Disallow: /paypal/
 Disallow: /admin/
-Disallow: /api/
-Disallow: /uploads/
-Disallow: /logout
+Disallow: /login
 Disallow: /registro
+Disallow: /logout
+Disallow: /api/
+Disallow: /uploads/pdfs/
+Disallow: /uploads/certificates/
+Disallow: /logs/
 
-# Allow login page (SEO entry point)
-Allow: /login
-Allow: /
+# Allow public static assets
+Allow: /assets/css/
+Allow: /assets/js/
+Allow: /assets/img/
+Allow: /assets/fonts/
 
-# Sitemap (create if needed)
+# Sitemap (add when public pages exist)
 # Sitemap: https://tudominio.com/sitemap.xml
