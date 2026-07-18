@@ -1,25 +1,36 @@
 <?php
-class Csrf {
-    public static function generate(): string {
-        if (empty($_SESSION['csrf_token'])) {
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+declare(strict_types=1);
+
+class Csrf
+{
+    private const TOKEN_NAME = 'csrf_token';
+
+    public static function generate(): string
+    {
+        if (empty($_SESSION[self::TOKEN_NAME])) {
+            $_SESSION[self::TOKEN_NAME] = bin2hex(random_bytes(32));
         }
-        return $_SESSION['csrf_token'];
+        return $_SESSION[self::TOKEN_NAME];
     }
 
-    public static function verify(string $token): bool {
-        return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+    public static function field(): string
+    {
+        $token = self::generate();
+        return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($token) . '">';
     }
 
-    public static function field(): string {
-        return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(self::generate()) . '">';
-    }
-
-    public static function check(): void {
+    public static function verify(): void
+    {
         $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-        if (!self::verify($token)) {
+        if (!hash_equals($_SESSION[self::TOKEN_NAME] ?? '', $token)) {
             http_response_code(403);
-            die(json_encode(['error' => 'CSRF token mismatch']));
+            die(json_encode(['error' => 'CSRF token inválido']));
         }
+    }
+
+    public static function verifyOrFail(): bool
+    {
+        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        return hash_equals($_SESSION[self::TOKEN_NAME] ?? '', $token);
     }
 }
