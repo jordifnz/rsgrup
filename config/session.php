@@ -1,6 +1,9 @@
 <?php
-function startSession(): void {
-    if (session_status() === PHP_SESSION_NONE) {
+declare(strict_types=1);
+
+function startSession(): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
         session_name(SESSION_NAME);
         session_set_cookie_params([
             'lifetime' => SESSION_LIFETIME,
@@ -10,41 +13,96 @@ function startSession(): void {
             'samesite' => 'Lax',
         ]);
         session_start();
+        // Regenerate session ID periodically to prevent fixation
+        if (!isset($_SESSION['_initiated'])) {
+            session_regenerate_id(true);
+            $_SESSION['_initiated'] = true;
+        }
     }
 }
 
-function isLoggedIn(): bool {
-    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+function isLoggedIn(): bool
+{
+    return !empty($_SESSION['user_id']);
 }
 
-function isAdmin(): bool {
-    return isLoggedIn() && ($_SESSION['user_role'] ?? '') === 'admin';
+function currentUser(): array|null
+{
+    if (!isLoggedIn()) return null;
+    return [
+        'id'     => $_SESSION['user_id'],
+        'name'   => $_SESSION['user_name'] ?? '',
+        'email'  => $_SESSION['user_email'] ?? '',
+        'role'   => $_SESSION['user_role'] ?? ROLE_ALUMNO,
+        'avatar' => $_SESSION['user_avatar'] ?? null,
+    ];
 }
 
-function requireLogin(string $redirect = ''): void {
+function isAdmin(): bool
+{
+    return ($_SESSION['user_role'] ?? '') === ROLE_ADMIN;
+}
+
+function requireLogin(string $redirectTo = '/login'): void
+{
     if (!isLoggedIn()) {
-        $ref = $redirect ?: $_SERVER['REQUEST_URI'] ?? '';
-        $target = '/login' . ($ref && $ref !== '/login' ? '?ref=' . urlencode($ref) : '');
-        header('Location: ' . BASE_URL . $target);
-        exit;
+        $referer = $_SERVER['REQUEST_URI'] ?? '';
+        if ($referer && $referer !== '/login') {
+            $_SESSION['login_redirect'] = $referer;
+        }
+        redirect($redirectTo);
     }
 }
 
-function requireAdmin(): void {
+function requireAdmin(): void
+{
     requireLogin();
     if (!isAdmin()) {
-        http_response_code(403);
-        include BASE_PATH . '/public/403.php';
-        exit;
+        redirect('/dashboard');
     }
 }
 
-function setFlash(string $type, string $message): void {
-    $_SESSION['flash'][$type] = $message;
+function loginUser(array $user): void
+{
+    session_regenerate_id(true);
+    $_SESSION['user_id']     = $user['id'];
+    $_SESSION['user_name']   = $user['nombre'] . ' ' . $user['apellidos'];
+    $_SESSION['user_email']  = $user['email'];
+    $_SESSION['user_role']   = $user['rol'];
+    $_SESSION['user_avatar'] = $user['avatar'] ?? null;
 }
 
-function getFlash(string $type): ?string {
-    $msg = $_SESSION['flash'][$type] ?? null;
-    unset($_SESSION['flash'][$type]);
-    return $msg;
+function logoutUser(): void
+{
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+    }
+    session_destroy();
+}
+
+function flash(string $key, mixed $value = null): mixed
+{
+    if ($value !== null) {
+        $_SESSION['_flash'][$key] = $value;
+        return null;
+    }
+    $val = $_SESSION['_flash'][$key] ?? null;
+    unset($_SESSION['_flash'][$key]);
+    return $val;
+}
+
+function redirect(string $url): never
+{
+    header('Location: ' . $url);
+    exit;
+}
+
+function getLoginRedirect(string $default = '/dashboard'): string
+{
+    $url = $_SESSION['login_redirect'] ?? $default;
+    unset($_SESSION['login_redirect']);
+    return $url;
 }
