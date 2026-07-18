@@ -1,76 +1,115 @@
 <?php
-class ExamModel {
-    public static function findById(int $id): ?array {
-        return Database::fetch("SELECT * FROM rsgrup_exams WHERE id = ?", [$id]);
+declare(strict_types=1);
+
+class ExamModel
+{
+    public static function findById(int $id): ?array
+    {
+        return Database::fetch('SELECT * FROM rsgrup_exams WHERE id=?', [$id]) ?: null;
     }
 
-    public static function getWithQuestions(int $examId): ?array {
-        $exam = self::findById($examId);
+    public static function findWithQuestions(int $id): ?array
+    {
+        $exam = self::findById($id);
         if (!$exam) return null;
-        $questions = Database::fetchAll(
-            "SELECT * FROM rsgrup_exam_questions WHERE exam_id = ? ORDER BY sort_order ASC",
-            [$examId]
+        $exam['questions'] = Database::fetchAll(
+            'SELECT * FROM rsgrup_exam_questions WHERE exam_id=? ORDER BY sort_order ASC', [$id]
         );
-        foreach ($questions as &$q) {
+        foreach ($exam['questions'] as &$q) {
             $q['answers'] = Database::fetchAll(
-                "SELECT * FROM rsgrup_exam_answers WHERE question_id = ? ORDER BY id ASC",
-                [$q['id']]
+                'SELECT * FROM rsgrup_exam_answers WHERE question_id=? ORDER BY id ASC', [$q['id']]
             );
         }
-        $exam['questions'] = $questions;
         return $exam;
     }
 
+    public static function getLastAttempt(int $userId, int $examId): ?array
+    {
+        return Database::fetch(
+            'SELECT * FROM rsgrup_exam_attempts WHERE user_id=? AND exam_id=? ORDER BY created_at DESC LIMIT 1',
+            [$userId, $examId]
+        ) ?: null;
+    }
+
     /**
-     * Corrige el intento y guarda la nota.
-     * $responses = ['question_id' => [answer_id, ...], ...]
+     * Evaluate submitted answers against correct answers.
+     * Returns score as percentage (0-100).
      */
-    public static function grade(int $userId, int $deliveryId, int $examId, array $responses): float {
+    public static function evaluate(int $examId, array $submitted): float
+    {
         $questions = Database::fetchAll(
-            "SELECT * FROM rsgrup_exam_questions WHERE exam_id = ?",
-            [$examId]
+            'SELECT * FROM rsgrup_exam_questions WHERE exam_id=? ORDER BY sort_order ASC', [$examId]
         );
-        $total   = count($questions);
+        if (!$questions) return 0.0;
+
         $correct = 0;
-
-        $attemptId = Database::insert(
-            "INSERT INTO rsgrup_exam_attempts (user_id, delivery_id, exam_id, score, created_at) VALUES (?,?,?,0,NOW())",
-            [$userId, $deliveryId, $examId]
-        );
-
         foreach ($questions as $q) {
-            $correctAnswers = Database::fetchAll(
-                "SELECT id FROM rsgrup_exam_answers WHERE question_id = ? AND is_correct = 1",
-                [$q['id']]
-            );
-            $correctIds = array_column($correctAnswers, 'id');
-            $given      = array_map('intval', (array)($responses[$q['id']] ?? []));
+            $qid     = $q['id'];
+            $answers = Database::fetchAll('SELECT * FROM rsgrup_exam_answers WHERE question_id=?', [$qid]);
+
+            $correctIds  = array_column(array_filter($answers, fn($a) => $a['is_correct']), 'id');
+            $submittedIds = isset($submitted[$qid]) ? (array)$submitted[$qid] : [];
+            $submittedIds = array_map('intval', $submittedIds);
 
             sort($correctIds);
-            sort($given);
-            $isCorrect = ($correctIds === $given) ? 1 : 0;
-            if ($isCorrect) $correct++;
+            sort($submittedIds);
 
-            Database::insert(
-                "INSERT INTO rsgrup_exam_attempt_answers (attempt_id, question_id, is_correct, created_at) VALUES (?,?,?,NOW())",
-                [$attemptId, $q['id'], $isCorrect]
-            );
-            foreach ($given as $answerId) {
-                Database::insert(
-                    "INSERT INTO rsgrup_exam_attempt_answers_selected (attempt_id, question_id, answer_id) VALUES (?,?,?)",
-                    [$attemptId, $q['id'], $answerId]
+            if ($correctIds === $submittedIds) $correct++;
+        }
+
+        return round(($correct / count($questions)) * 100, 2);
+    }
+
+    public static function saveAttempt(int $userId, int $examId, array $submitted, float $score): int
+    {
+        Database::execute(
+            'INSERT INTO rsgrup_exam_attempts (user_id,exam_id,score,created_at) VALUES (?,?,?,NOW())',
+            [$userId, $examId, $score]
+        );
+        $attemptId = (int) Database::lastInsertId();
+
+        foreach ($submitted as $questionId => $answerIds) {
+            foreach ((array)$answerIds as $answerId) {
+                Database::execute(
+                    'INSERT INTO rsgrup_exam_attempt_answers (attempt_id,question_id,answer_id) VALUES (?,?,?)',
+                    [$attemptId, (int)$questionId, (int)$answerId]
                 );
             }
         }
-
-        $score = $total > 0 ? round(($correct / $total) * 10, 2) : 0.0;
-        Database::query("UPDATE rsgrup_exam_attempts SET score = ? WHERE id = ?", [$score, $attemptId]);
-        return $score;
+        return $attemptId;
     }
 
-    public static function getAll(): array {
-        return Database::fetchAll(
-            "SELECT ex.*, d.title as delivery_title FROM rsgrup_exams ex LEFT JOIN rsgrup_deliveries d ON d.exam_id=ex.id ORDER BY ex.id DESC"
-        );
+    public static function saveQuestions(int $examId, array $questions): void
+    {
+        // Delete existing questions and answers (cascade)
+        $existing = Database::fetchAll('SELECT id FROM rsgrup_exam_questions WHERE exam_id=?', [$examId]);
+        foreach ($existing as $q) {
+            Database::execute('DELETE FROM rsgrup_exam_answers WHERE question_id=?', [$q['id']]);
+        }
+        Database::execute('DELETE FROM rsgrup_exam_questions WHERE exam_id=?', [$examId]);
+
+        foreach ($questions as $idx => $q) {
+            $title = Sanitize::string($q['title'] ?? '');
+            $body  = Sanitize::html($q['body'] ?? '');
+            $type  = ($q['type'] ?? 'radio') === 'checkbox' ? 'checkbox' : 'radio';
+            $sort  = (int)$idx;
+
+            Database::execute(
+                'INSERT INTO rsgrup_exam_questions (exam_id,title,body,type,sort_order,created_at) VALUES (?,?,?,?,?,NOW())',
+                [$examId, $title, $body, $type, $sort]
+            );
+            $qid = (int) Database::lastInsertId();
+
+            if (!empty($q['answers']) && is_array($q['answers'])) {
+                foreach ($q['answers'] as $a) {
+                    $aText    = Sanitize::string($a['text'] ?? '');
+                    $isCorrect = !empty($a['is_correct']) ? 1 : 0;
+                    Database::execute(
+                        'INSERT INTO rsgrup_exam_answers (question_id,text,is_correct) VALUES (?,?,?)',
+                        [$qid, $aText, $isCorrect]
+                    );
+                }
+            }
+        }
     }
 }
