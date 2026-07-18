@@ -1,0 +1,23 @@
+User-agent: *
+
+# Block all private/authenticated areas
+Disallow: /dashboard
+Disallow: /perfil
+Disallow: /entrega/
+Disallow: /inscribir
+Disallow: /examen/
+Disallow: /descargar-pdf/
+Disallow: /descargar-titulo
+Disallow: /paypal/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /logout
+Disallow: /registro
+
+# Allow login page (SEO entry point)
+Allow: /login
+Allow: /
+
+# Sitemap (create if needed)
+# Sitemap: https://tudominio.com/sitemap.xml
