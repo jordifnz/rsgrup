@@ -1,80 +1,91 @@
 <?php
-$metaTitle = 'Registro';
-$robots = 'noindex,nofollow';
+$metaTitle = 'Crear cuenta';
+$robots    = 'noindex,nofollow';
 include BASE_PATH . '/templates/layouts/base.php';
 ?>
 <section class="auth-section">
   <div class="auth-card auth-card--wide">
     <div class="auth-logo">
-      <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="RSGrup" width="200" height="100" loading="eager">
+      <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="<?= APP_NAME ?>" width="250" height="125" loading="eager">
     </div>
     <h1 class="auth-title">Crear cuenta</h1>
-    <form action="<?= BASE_URL ?>/registro" method="POST" enctype="multipart/form-data" class="form" novalidate>
+    <?php if ($flash = getFlash()): ?>
+      <div class="flash flash--<?= $flash['type'] ?>" role="alert"><?= htmlspecialchars($flash['message']) ?></div>
+    <?php endif; ?>
+    <form action="<?= BASE_URL ?>/registro" method="POST" class="form" novalidate>
       <?= Csrf::field() ?>
       <?php if (!empty($redirect)): ?>
         <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
       <?php endif; ?>
       <div class="form-grid">
         <div class="form-group">
-          <label for="reg-name">Nombre *</label>
-          <input type="text" id="reg-name" name="name" required value="<?= htmlspecialchars($old['name'] ?? '') ?>" autocomplete="given-name">
+          <label for="name">Nombre *</label>
+          <input type="text" id="name" name="name" required autocomplete="given-name"
+                 value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-surnames">Apellidos *</label>
-          <input type="text" id="reg-surnames" name="surnames" required value="<?= htmlspecialchars($old['surnames'] ?? '') ?>" autocomplete="family-name">
-        </div>
-        <div class="form-group form-group--full">
-          <label for="reg-email">Correo electrónico *</label>
-          <input type="email" id="reg-email" name="email" required value="<?= htmlspecialchars($old['email'] ?? '') ?>" autocomplete="email">
+          <label for="surnames">Apellidos *</label>
+          <input type="text" id="surnames" name="surnames" required autocomplete="family-name"
+                 value="<?= htmlspecialchars($_POST['surnames'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-phone">Teléfono</label>
-          <input type="tel" id="reg-phone" name="phone" value="<?= htmlspecialchars($old['phone'] ?? '') ?>" autocomplete="tel">
+          <label for="reg-email">Email *</label>
+          <input type="email" id="reg-email" name="email" required autocomplete="email"
+                 value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-address">Dirección</label>
-          <input type="text" id="reg-address" name="address" value="<?= htmlspecialchars($old['address'] ?? '') ?>" autocomplete="street-address">
+          <label for="phone">Teléfono</label>
+          <input type="tel" id="phone" name="phone" autocomplete="tel"
+                 value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-postal">Código postal</label>
-          <input type="text" id="reg-postal" name="postal_code" value="<?= htmlspecialchars($old['postal_code'] ?? '') ?>" autocomplete="postal-code">
+          <label for="address">Dirección</label>
+          <input type="text" id="address" name="address" autocomplete="street-address"
+                 value="<?= htmlspecialchars($_POST['address'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-city">Población</label>
-          <input type="text" id="reg-city" name="city" value="<?= htmlspecialchars($old['city'] ?? '') ?>" autocomplete="address-level2">
+          <label for="postal_code">Código postal</label>
+          <input type="text" id="postal_code" name="postal_code" autocomplete="postal-code"
+                 value="<?= htmlspecialchars($_POST['postal_code'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-province">Provincia</label>
-          <input type="text" id="reg-province" name="province" value="<?= htmlspecialchars($old['province'] ?? '') ?>">
+          <label for="city">Población</label>
+          <input type="text" id="city" name="city" autocomplete="address-level2"
+                 value="<?= htmlspecialchars($_POST['city'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-instagram">Instagram</label>
-          <input type="text" id="reg-instagram" name="instagram" value="<?= htmlspecialchars($old['instagram'] ?? '') ?>" placeholder="@usuario">
+          <label for="province">Provincia</label>
+          <input type="text" id="province" name="province"
+                 value="<?= htmlspecialchars($_POST['province'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label for="reg-tiktok">TikTok</label>
-          <input type="text" id="reg-tiktok" name="tiktok" value="<?= htmlspecialchars($old['tiktok'] ?? '') ?>" placeholder="@usuario">
+          <label for="instagram">Instagram</label>
+          <input type="text" id="instagram" name="instagram" placeholder="@usuario"
+                 value="<?= htmlspecialchars($_POST['instagram'] ?? '') ?>">
         </div>
-        <div class="form-group form-group--full">
-          <label for="reg-password">Contraseña * <span class="text-muted text-sm">(mínimo 8 caracteres)</span></label>
-          <input type="password" id="reg-password" name="password" required minlength="8" autocomplete="new-password">
+        <div class="form-group">
+          <label for="tiktok">TikTok</label>
+          <input type="text" id="tiktok" name="tiktok" placeholder="@usuario"
+                 value="<?= htmlspecialchars($_POST['tiktok'] ?? '') ?>">
         </div>
-        <div class="form-group form-group--full">
-          <label for="reg-password2">Repetir contraseña *</label>
-          <input type="password" id="reg-password2" name="password_confirm" required minlength="8" autocomplete="new-password">
+        <div class="form-group">
+          <label for="reg-password">Contraseña *</label>
+          <div class="input-with-toggle">
+            <input type="password" id="reg-password" name="password" required
+                   autocomplete="new-password" minlength="8">
+            <button type="button" class="btn-icon" onclick="togglePassword('reg-password')" aria-label="Mostrar/ocultar">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
         </div>
       </div>
       <!-- Honeypot anti-bot -->
-      <input type="text" name="website" class="sr-only" tabindex="-1" autocomplete="off">
-      <!-- Captcha simple matemático -->
-      <div class="form-group captcha-group">
-        <label for="captcha"><?= htmlspecialchars($captchaQ ?? '?') ?> = <span class="text-muted text-sm">(anti-bots)</span></label>
-        <input type="number" id="captcha" name="captcha" required style="max-width:100px">
-        <input type="hidden" name="captcha_hash" value="<?= htmlspecialchars($captchaHash ?? '') ?>">
+      <div style="display:none" aria-hidden="true">
+        <label>No rellenar <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
       </div>
-      <button type="submit" class="btn btn-primary btn-full">Crear cuenta</button>
+      <button type="submit" class="btn btn-primary btn--full" style="margin-top:var(--space-4)">Crear cuenta</button>
     </form>
-    <p class="auth-footer-text">¿Ya tienes cuenta? <a href="<?= BASE_URL ?>/login">Acceder</a></p>
+    <p class="auth-footer">¿Ya tienes cuenta? <a href="<?= BASE_URL ?>/login">Acceder</a></p>
   </div>
 </section>
 <?php include BASE_PATH . '/templates/layouts/base_close.php'; ?>
