@@ -1,23 +1,36 @@
 <?php
-$metaTitle = 'Mi formación';
-$robots = 'noindex,nofollow';
+$metaTitle = 'Dashboard';
+$robots    = 'noindex,nofollow';
 include BASE_PATH . '/templates/layouts/base.php';
 ?>
 <section class="dashboard-section">
   <div class="container">
     <div class="dashboard-header">
-      <div class="dashboard-welcome">
+      <div class="welcome-block">
         <?php if ($user['avatar']): ?>
-          <img src="<?= BASE_URL . htmlspecialchars($user['avatar']) ?>" alt="Avatar" width="48" height="48" class="avatar-img avatar-md">
+          <img src="<?= BASE_URL . htmlspecialchars($user['avatar']) ?>" class="avatar-img" alt="Avatar" width="56" height="56">
         <?php else: ?>
-          <div class="avatar-initials avatar-md"><?= htmlspecialchars(UserModel::getInitials($user)) ?></div>
+          <div class="avatar-initials"><?= htmlspecialchars(substr($user['name'],0,1) . substr($user['surnames'],0,1)) ?></div>
         <?php endif; ?>
         <div>
           <h1 class="h2">Hola, <?= htmlspecialchars($user['name']) ?></h1>
-          <p class="text-muted">Aquí tienes tu progreso formativo</p>
+          <p class="text-muted">Gestiona tus entregas y exámenes</p>
         </div>
       </div>
+      <?php if ($canDownloadCertificate): ?>
+        <a href="<?= BASE_URL ?>/descargar-titulo" class="btn btn-primary">
+          <i data-lucide="award"></i> Descargar título
+        </a>
+      <?php else: ?>
+        <button class="btn" disabled title="Completa todas las entregas para descargar el título">
+          <i data-lucide="award"></i> Descargar título
+        </button>
+      <?php endif; ?>
     </div>
+
+    <?php if ($flash = getFlash()): ?>
+      <div class="flash flash--<?= $flash['type'] ?>" role="alert"><?= htmlspecialchars($flash['message']) ?></div>
+    <?php endif; ?>
 
     <?php foreach ($courses as $course): ?>
     <div class="course-block">
@@ -25,78 +38,62 @@ include BASE_PATH . '/templates/layouts/base.php';
       <?php if (!empty($course['description'])): ?>
         <p class="course-desc text-muted"><?= htmlspecialchars(strip_tags($course['description'])) ?></p>
       <?php endif; ?>
-
       <div class="deliveries-grid">
         <?php foreach ($course['deliveries'] as $d):
-          $enrolled   = $d['enrollment'] ?? null;
-          $canEnroll  = $d['can_enroll'];
-          $isPractica = $d['type'] === 'practica';
-          $isMatricula = $d['type'] === 'matricula';
-          $examScore  = $d['exam_score'] ?? null;
-          $hasExam    = !empty($d['exam_id']);
+          $enrolled  = $d['enrollment'] ?? null;
+          $isActive  = ($enrolled['status'] ?? '') === STATUS_ACTIVE;
+          $canEnroll = $d['can_enroll'];
+          $examScore = $d['exam_score'] ?? null;
         ?>
-        <article class="delivery-card delivery-card--<?= $d['type'] ?><?= $enrolled ? ' delivery-card--enrolled' : '' ?>">
+        <div class="delivery-card delivery-card--<?= $d['type'] ?> <?= $isActive ? 'delivery-card--active' : '' ?>">
           <div class="delivery-card__header">
-            <span class="badge badge-type badge-<?= $d['type'] ?>"><?= $isMatricula ? 'Matrícula' : ($isPractica ? 'Práctica' : 'Entrega') ?></span>
-            <span class="delivery-order">#<?= (int)$d['sort_order'] ?></span>
+            <span class="badge badge-<?= $d['type'] ?>"><?= ucfirst($d['type']) ?></span>
+            <span class="delivery-order">#<?= $d['sort_order'] ?></span>
           </div>
-          <h3 class="delivery-title"><?= htmlspecialchars($d['title']) ?></h3>
-          <?php if (!empty($d['description'])): ?>
-            <p class="delivery-desc"><?= htmlspecialchars(strip_tags($d['description'])) ?></p>
-          <?php endif; ?>
-          <div class="delivery-card__footer">
-            <?php if ($enrolled && $enrolled['status'] === 'active'): ?>
-              <span class="badge badge-success">Inscrito</span>
-              <?php if (!$isMatricula): ?>
-                <a href="<?= BASE_URL ?>/entrega/<?= $d['id'] ?>" class="btn btn-sm btn-primary">Ver entrega</a>
+          <h3 class="delivery-card__title"><?= htmlspecialchars($d['title']) ?></h3>
+          <p class="delivery-card__price">
+            <?= $d['price'] > 0 ? number_format((float)$d['price'], 2, ',', '.') . ' €' : 'Gratuito' ?>
+          </p>
+
+          <?php if ($isActive): ?>
+            <div class="delivery-card__actions">
+              <?php if ($d['type'] !== TYPE_MATRICULA && $d['pdf_filename']): ?>
+                <a href="<?= BASE_URL ?>/descargar-pdf/<?= $d['id'] ?>" class="btn btn-sm">
+                  <i data-lucide="download"></i> Descargar PDF
+                </a>
               <?php endif; ?>
-              <?php if ($hasExam): ?>
+              <?php if ($d['exam_id']): ?>
                 <?php if ($examScore !== null): ?>
-                  <span class="exam-score">Nota: <strong><?= number_format($examScore, 1) ?></strong></span>
+                  <span class="exam-score">Nota: <strong><?= number_format((float)$examScore, 1) ?></strong></span>
                 <?php else: ?>
-                  <a href="<?= BASE_URL ?>/entrega/<?= $d['id'] ?>#examen" class="btn btn-sm">Hacer examen</a>
+                  <a href="<?= BASE_URL ?>/entrega/<?= htmlspecialchars($d['slug']) ?>#examen" class="btn btn-sm btn-primary">
+                    <i data-lucide="pencil"></i> Hacer examen
+                  </a>
                 <?php endif; ?>
               <?php endif; ?>
-            <?php elseif ($canEnroll): ?>
-              <span class="delivery-price"><?= number_format($d['price'], 2, ',', '.') ?> €</span>
-              <?php if ($isPractica): ?>
-                <a href="<?= BASE_URL ?>/inscribir/<?= $d['id'] ?>" class="btn btn-sm btn-secondary">Inscribirme (presencial)</a>
+            </div>
+          <?php elseif ($canEnroll): ?>
+            <form action="<?= BASE_URL ?>/inscribir" method="POST" class="delivery-card__enroll">
+              <?= Csrf::field() ?>
+              <input type="hidden" name="delivery_id" value="<?= $d['id'] ?>">
+              <?php if ($d['payment_type'] === PAYMENT_ONLINE && $d['price'] > 0): ?>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i data-lucide="credit-card"></i> Inscribirme (PayPal)
+                </button>
               <?php else: ?>
-                <a href="<?= BASE_URL ?>/paypal/iniciar/<?= $d['id'] ?>" class="btn btn-sm btn-primary">Inscribirme</a>
+                <button type="submit" class="btn btn-sm">
+                  <i data-lucide="check"></i> Inscribirme
+                </button>
               <?php endif; ?>
-            <?php else: ?>
-              <span class="badge badge-locked">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                Bloqueado
-              </span>
-            <?php endif; ?>
-          </div>
-        </article>
+            </form>
+          <?php else: ?>
+            <button class="btn btn-sm" disabled>Bloqueado</button>
+          <?php endif; ?>
+        </div>
         <?php endforeach; ?>
       </div>
     </div>
     <?php endforeach; ?>
-
-    <!-- Título -->
-    <?php if ($canDownloadCertificate): ?>
-    <div class="certificate-banner">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
-      <div>
-        <strong>¡Enhorabuena! Has completado toda la formación.</strong>
-        <p class="text-muted text-sm">Ya puedes descargar tu título.</p>
-      </div>
-      <a href="<?= BASE_URL ?>/titulo/descargar" class="btn btn-primary">Descargar título</a>
-    </div>
-    <?php else: ?>
-    <div class="certificate-banner certificate-banner--locked">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      <div>
-        <strong>Título no disponible aún</strong>
-        <p class="text-muted text-sm">Completa todas las entregas y exámenes para desbloquear tu título.</p>
-      </div>
-      <button class="btn btn-disabled" disabled>Descargar título</button>
-    </div>
-    <?php endif; ?>
   </div>
 </section>
 <?php include BASE_PATH . '/templates/layouts/base_close.php'; ?>
