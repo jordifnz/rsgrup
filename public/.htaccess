@@ -11,43 +11,33 @@ RewriteEngine On
 # BLOQUEO DE ARCHIVOS SENSIBLES Y RUTAS DE RECONOCIMIENTO
 # ============================================================
 
-# --- Archivos .env (cualquier variante) ---------------------
 <FilesMatch "^\.(env|env\..*|envrc)$">
     Require all denied
 </FilesMatch>
 
-# --- Archivos de configuración/backup expuestos -------------
 <FilesMatch "(\.bak|\.backup|\.old|\.orig|\.sql|\.dump|\.log|\.sh|\.bash|\.zsh|\.swp|\.swo|\.DS_Store|Thumbs\.db|\.htpasswd|\.htaccess\.bak|composer\.lock|package-lock\.json|yarn\.lock|Makefile|Dockerfile|\.dockerignore)$">
     Require all denied
 </FilesMatch>
 
-# --- Git, SVN, Mercurial, Composer -------------------------
 RewriteRule ^\.(git|svn|hg)(/|$) - [F,L]
 RewriteRule (^\.|\/\.)git - [F,L]
 RewriteRule ^(vendor|node_modules)(/|$) - [F,L]
 
-# --- WordPress / CMS genérico (bots que prueban aunque no uses WP) ---
 RewriteRule ^(wp-login|wp-admin|wp-config|xmlrpc|wp-includes|wp-content)(\.php)?(/|$) - [F,L]
-
-# --- Rutas de reconocimiento habituales de bots/scanners ---
 RewriteRule ^(\.well-known/cpanel|cgi-bin|phpmyadmin|pma|myadmin|mysqladmin|admin/pma|dbadmin|mypma|php-my-admin)(/|$) - [F,L]
 RewriteRule ^(shell|cmd|config\.bak|site\.bak|backup|database\.sql|dump\.sql|db\.sql|install\.php|setup\.php|test\.php|info\.php|phpinfo\.php) - [F,L]
 
-# --- Bloquear User-Agents maliciosos conocidos --------------
 <IfModule mod_rewrite.c>
     RewriteCond %{HTTP_USER_AGENT} (libwww-perl|python-requests|Go-http-client|zgrab|masscan|nmap|sqlmap|nikto|curl\/[0-7]|wget\/[0-1]|WPScan|Nuclei|Dirbuster|gobuster|feroxbuster) [NC]
     RewriteRule .* - [F,L]
 </IfModule>
 
-# --- Bloquear métodos HTTP no necesarios --------------------
 <LimitExcept GET POST HEAD OPTIONS>
     Require all denied
 </LimitExcept>
 
-# --- Bloquear acceso directo a directorios del proyecto -----
 RewriteRule ^(config|src|templates|logs|sql)(/|$) - [F,L]
 
-# --- Bloquear ejecución PHP en uploads ----------------------
 RewriteCond %{REQUEST_URI} ^/uploads/
 RewriteRule \.php$ - [F,L]
 
@@ -55,12 +45,10 @@ RewriteRule \.php$ - [F,L]
 # ENRUTAMIENTO
 # ============================================================
 
-# API: /api/* → api/v1/index.php
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^api/(.*)$ ../api/v1/index.php [QSA,L]
 
-# Router principal: todo lo demás → index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
@@ -69,28 +57,18 @@ RewriteRule ^ index.php [QSA,L]
 # CABECERAS DE SEGURIDAD
 # ============================================================
 <IfModule mod_headers.c>
-    # Impide que navegadores huelan el tipo MIME
     Header always set X-Content-Type-Options "nosniff"
-
-    # Protege contra clickjacking
     Header always set X-Frame-Options "SAMEORIGIN"
-
-    # XSS legacy (navegadores viejos)
     Header always set X-XSS-Protection "1; mode=block"
-
-    # Política de referrer
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-
-    # Deshabilitar funciones de navegador no necesarias
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 
-    # HSTS: forzar HTTPS durante 1 año (activa SOLO cuando tengas SSL estable)
+    # HSTS: activa SOLO cuando tengas SSL estable
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-    # Content Security Policy: ajusta los dominios según añadas CDNs
+    # CSP — todos los CDNs usados en el proyecto
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self'; base-uri 'self';"
 
-    # Eliminar header que revela servidor
     Header always unset Server
     Header always unset X-Powered-By
 </IfModule>
@@ -98,8 +76,6 @@ RewriteRule ^ index.php [QSA,L]
 # ============================================================
 # RENDIMIENTO
 # ============================================================
-
-# Cache de assets estáticos
 <IfModule mod_expires.c>
     ExpiresActive On
     ExpiresByType text/css               "access plus 1 month"
@@ -111,7 +87,6 @@ RewriteRule ^ index.php [QSA,L]
     ExpiresByType application/pdf        "access plus 1 week"
 </IfModule>
 
-# Compresión gzip
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json text/plain text/xml
 </IfModule>

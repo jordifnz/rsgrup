@@ -2,8 +2,7 @@
 // Base layout - open. Variables expected: $metaTitle, $robots (optional)
 $metaTitle = $metaTitle ?? APP_NAME;
 $robots    = $robots    ?? 'noindex,nofollow';
-$user      = $_SESSION['user'] ?? null;
-$isAdmin   = ($user['role'] ?? '') === ROLE_ADMIN;
+$isAdmin   = isAdmin();
 $baseUrl   = BASE_URL;
 ?>
 <!DOCTYPE html>
@@ -22,8 +21,8 @@ $baseUrl   = BASE_URL;
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <!-- CSS -->
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
-  <!-- Lucide icons -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <!-- Lucide icons (jsdelivr — ya en CSP) -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
   <a class="sr-only" href="#main-content">Saltar al contenido</a>
