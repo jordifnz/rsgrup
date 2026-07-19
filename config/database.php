@@ -49,6 +49,12 @@ class Database
         return self::query($sql, $params)->fetch();
     }
 
+    /** Alias de fetchOne() — compatibilidad con código legacy. */
+    public static function fetchRow(string $sql, array $params = []): array|false
+    {
+        return self::fetchOne($sql, $params);
+    }
+
     /** Alias de fetchOne() — compatibilidad con modelos. */
     public static function fetch(string $sql, array $params = []): array|false
     {
@@ -106,7 +112,6 @@ class Database
     public static function rollback(): void         { self::getInstance()->rollBack(); }
 
     // ── Settings helpers ──────────────────────────────────────────────
-    // NOTA: rsgrup_settings usa columnas `key` y `value` (según schema.sql)
 
     public static function getSetting(string $key, mixed $default = null): mixed
     {
