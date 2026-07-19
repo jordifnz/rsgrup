@@ -1,8 +1,11 @@
 <?php
 // templates/student/dashboard.php
+$metaTitle = 'Mi panel';
 include BASE_PATH . '/templates/partials/header.php';
-
-// Calcular si el alumno ha completado todas las entregas (tipo entrega) con examen realizado
+?>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
+<?php
+// Calcular si el alumno ha completado todas las entregas con examen realizado
 $allDeliveries = Database::fetchAll(
     "SELECT d.id FROM rsgrup_deliveries d WHERE d.active=1 AND d.type IN('entrega','practica') ORDER BY d.sort_order"
 );
@@ -32,14 +35,23 @@ $userEnrolls = Database::fetchAll(
 $enrolledIds = array_column($userEnrolls, 'delivery_id');
 ?>
 
-<div class="container" style="padding:2rem 1rem">
+<div class="dashboard-wrap">
   <h1>Mi panel</h1>
+
+  <?php if(!empty($_SESSION['flash_success'])): ?>
+    <div class="alert alert-success" style="margin-bottom:var(--space-4)"><?= htmlspecialchars($_SESSION['flash_success']) ?></div>
+    <?php unset($_SESSION['flash_success']); ?>
+  <?php endif; ?>
+  <?php if(!empty($_SESSION['flash_error'])): ?>
+    <div class="alert alert-error" style="margin-bottom:var(--space-4)"><?= htmlspecialchars($_SESSION['flash_error']) ?></div>
+    <?php unset($_SESSION['flash_error']); ?>
+  <?php endif; ?>
 
   <?php if(empty($courses)): ?>
     <div class="empty-state">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       <h3>No hay cursos disponibles</h3>
-      <p>Cuando haya cursos publicados aparecerán aquí.</p>
+      <p>Cuando haya cursos publicados aparecer&aacute;n aqu&iacute;.</p>
     </div>
   <?php else: ?>
     <?php foreach($courses as $course): ?>
@@ -62,7 +74,7 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
             <?php $enrolled = !empty($d['enroll_id']); ?>
             <div class="delivery-row <?= $enrolled ? 'enrolled' : 'not-enrolled' ?>">
               <div class="delivery-info">
-                <span class="delivery-type-badge badge-<?= $d['type'] ?>"><?= ucfirst($d['type']) ?></span>
+                <span class="badge badge-<?= $d['type'] ?>"><?= ucfirst($d['type']) ?></span>
                 <span class="delivery-title"><?= htmlspecialchars($d['title']) ?></span>
                 <?php if($enrolled && $d['score'] !== null): ?>
                   <span class="badge badge-score">Nota: <?= number_format((float)$d['score'], 1) ?></span>
@@ -75,9 +87,9 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
                   <a href="<?= BASE_URL ?>/entrega/<?= $d['id'] ?>" class="btn btn-sm btn-primary">Acceder</a>
                 <?php else: ?>
                   <?php if($d['type'] === 'practica'): ?>
-                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> € (presencial)</span>
+                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> &euro; (presencial)</span>
                   <?php elseif($d['price'] > 0): ?>
-                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> €</span>
+                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> &euro;</span>
                   <?php endif; ?>
                   <a href="<?= BASE_URL ?>/inscribir/<?= $d['id'] ?>" class="btn btn-sm">Inscribirme</a>
                 <?php endif; ?>
@@ -89,18 +101,18 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
     <?php endforeach; ?>
   <?php endif; ?>
 
-  <!-- Descargar título -->
-  <div style="margin-top:2.5rem;text-align:center">
+  <!-- Descargar t&iacute;tulo -->
+  <div class="title-cta">
     <?php if($titleReady): ?>
       <a href="<?= BASE_URL ?>/descargar-titulo" class="btn btn-primary btn-lg">
-        🎓 Descargar mi título
+        &#127891; Descargar mi t&iacute;tulo
       </a>
     <?php else: ?>
       <button class="btn btn-primary btn-lg" disabled
-              title="Completa todas las entregas y sus exámenes para descargar tu título">
-        🎓 Descargar mi título
+              title="Completa todas las entregas y sus ex&aacute;menes para descargar tu t&iacute;tulo">
+        &#127891; Descargar mi t&iacute;tulo
       </button>
-      <p style="font-size:.85rem;color:var(--color-text-muted);margin-top:.5rem">Disponible cuando completes todas las entregas y exámenes.</p>
+      <p>Disponible cuando completes todas las entregas y ex&aacute;menes.</p>
     <?php endif; ?>
   </div>
 </div>
