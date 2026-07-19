@@ -83,7 +83,6 @@ class AdminController
         $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        // PDF upload
         $pdfPath = $_POST['existing_pdf'] ?? null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
@@ -161,15 +160,12 @@ class AdminController
             Database::execute('INSERT INTO rsgrup_exams (title,description,created_at,updated_at) VALUES (?,?,NOW(),NOW())', [$title,$description]);
             $id = (int) Database::lastInsertId();
         }
-
         if ($deliveryId) {
             Database::execute('UPDATE rsgrup_deliveries SET exam_id=? WHERE id=?', [$id, $deliveryId]);
         }
-
         if (isset($_POST['questions']) && is_array($_POST['questions'])) {
             ExamModel::saveQuestions($id, $_POST['questions']);
         }
-
         ActivityLogger::log($_SESSION['user_id'], 'exam_saved', "Exámen: {$title}");
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
@@ -198,7 +194,6 @@ class AdminController
             $bind = array_merge($bind, [$s, $s, $s]);
         }
         if ($role) { $where .= ' AND u.role=?'; $bind[] = $role; }
-
         $sql = "SELECT u.*,
                     CASE WHEN m.id IS NOT NULL THEN 1 ELSE 0 END AS has_matricula
                 FROM rsgrup_users u
@@ -208,7 +203,6 @@ class AdminController
                     AND m.delivery_id IN (SELECT id FROM rsgrup_deliveries WHERE type='matricula')
                 {$where}
                 ORDER BY u.created_at DESC";
-
         $users     = Database::fetchAll($sql, $bind);
         $metaTitle = 'Usuarios';
         $robots    = 'noindex,nofollow';
@@ -248,7 +242,6 @@ class AdminController
         ];
         $pass = $_POST['password'] ?? '';
         if ($pass) $data['password'] = $pass;
-
         if ($id) {
             UserModel::update($id, $data);
         } else {
@@ -286,19 +279,34 @@ class AdminController
         $this->boot();
         Csrf::verify();
 
-        // Certificate PNG upload
-        if (!empty($_FILES['cert_bg']['tmp_name'])) {
+        // Certificate PNG/JPG upload
+        if (!empty($_FILES['cert_bg']['tmp_name']) && $_FILES['cert_bg']['error'] === UPLOAD_ERR_OK) {
             $ext = strtolower(pathinfo($_FILES['cert_bg']['name'], PATHINFO_EXTENSION));
             if (in_array($ext, ['png','jpg','jpeg'])) {
-                $dest = BASE_PATH . '/public/uploads/certificates/background.' . $ext;
-                move_uploaded_file($_FILES['cert_bg']['tmp_name'], $dest);
-                $_POST['cert_bg_path'] = '/uploads/certificates/background.' . $ext;
+                $uploadDir = BASE_PATH . '/public/uploads/certificates/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                $filename = 'background.' . $ext;
+                move_uploaded_file($_FILES['cert_bg']['tmp_name'], $uploadDir . $filename);
+                // Store path relative to public root (used by BASE_URL in frontend)
+                $_POST['cert_bg_path'] = '/uploads/certificates/' . $filename;
             }
         }
 
-        // Sync brand_accent_color from hex input if present
+        // Normalize color: always store with #
+        foreach (['brand_accent_color', 'cert_name_color'] as $colorKey) {
+            if (isset($_POST[$colorKey]) && !empty($_POST[$colorKey])) {
+                $c = ltrim($_POST[$colorKey], '#');
+                if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
+                    $_POST[$colorKey] = '#' . strtolower($c);
+                }
+            }
+        }
+        // Sync brand_accent_color from hex text input if provided
         if (!empty($_POST['brand_accent_color_hex'])) {
-            $_POST['brand_accent_color'] = $_POST['brand_accent_color_hex'];
+            $c = ltrim($_POST['brand_accent_color_hex'], '#');
+            if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
+                $_POST['brand_accent_color'] = '#' . strtolower($c);
+            }
         }
 
         $allowed = [

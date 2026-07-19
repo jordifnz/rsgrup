@@ -9,16 +9,15 @@ class CertificateService
         $nameX    = (int)$this->getSetting('cert_name_x', '480');
         $nameY    = (int)$this->getSetting('cert_name_y', '300');
         $fontSize = (int)$this->getSetting('cert_name_fontsize', '40');
-        $color    = $this->getSetting('cert_name_color', '000000');
-        $fullName = $user['name'] . ' ' . $user['surnames'];
+        $color    = ltrim($this->getSetting('cert_name_color', '000000'), '#'); // strip # if present
+        $fullName = trim(($user['name'] ?? '') . ' ' . ($user['surnames'] ?? ''));
 
         if (!file_exists($bgPath)) {
             http_response_code(404);
-            echo 'Fondo del título no configurado.';
+            echo 'Fondo del título no configurado. Sube un PNG en Ajustes > Título de alumnos.';
             return;
         }
 
-        // Load image
         $ext = strtolower(pathinfo($bgPath, PATHINFO_EXTENSION));
         $img = match($ext) {
             'jpg','jpeg' => imagecreatefromjpeg($bgPath),
@@ -27,13 +26,14 @@ class CertificateService
         };
         if (!$img) { echo 'Error al cargar imagen de fondo.'; return; }
 
-        // Parse color
-        $r = hexdec(substr($color, 0, 2));
-        $g = hexdec(substr($color, 2, 2));
-        $b = hexdec(substr($color, 4, 2));
+        // Parse color (accepts 000000 or #000000)
+        $hex = str_pad($color, 6, '0');
+        $r   = hexdec(substr($hex, 0, 2));
+        $g   = hexdec(substr($hex, 2, 2));
+        $b   = hexdec(substr($hex, 4, 2));
         $textColor = imagecolorallocate($img, $r, $g, $b);
 
-        // Font (use bundled or system)
+        // Font
         $fontPath = BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf';
         if (!file_exists($fontPath)) {
             $fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
@@ -45,7 +45,6 @@ class CertificateService
             imagestring($img, 5, $nameX, $nameY, $fullName, $textColor);
         }
 
-        // Output as PDF (use FPDF if available)
         if (class_exists('FPDF')) {
             $this->outputPdf($img, $fullName);
         } else {
@@ -60,7 +59,6 @@ class CertificateService
     {
         $tmpImg = sys_get_temp_dir() . '/cert_' . uniqid() . '.png';
         imagepng($img, $tmpImg);
-
         $pdf = new FPDF('L', 'mm', 'A4');
         $pdf->AddPage();
         $pdf->Image($tmpImg, 0, 0, 297, 210);

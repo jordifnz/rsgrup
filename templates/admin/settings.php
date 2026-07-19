@@ -14,9 +14,6 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- FORM PRINCIPAL (PayPal, SMTP, Evo API, WA, Plantillas, Cert) -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data" id="form-settings">
 <?= \Csrf::field() ?>
 
@@ -24,30 +21,23 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 <details class="settings-section" open>
   <summary>🎨 Estilos de la aplicación</summary>
   <div class="settings-body">
-    <p class="settings-hint">Define los colores corporativos. Se aplican en botones, enlaces y elementos de acento.</p>
     <div class="form-grid">
       <div class="form-group">
-        <label>Color de botones y enlaces (hex)</label>
-        <div style="display:flex;align-items:center;gap:.75rem">
-          <input type="color" name="brand_accent_color"
+        <label>Color de botones y enlaces</label>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+          <input type="color" id="pick-brand" name="brand_accent_color"
                  value="<?= htmlspecialchars($s['brand_accent_color'] ?? '#e87722') ?>"
                  style="width:48px;height:38px;padding:2px;border-radius:6px;cursor:pointer;border:1px solid var(--color-border)">
-          <input type="text" name="brand_accent_color_hex"
+          <input type="text" id="hex-brand" name="brand_accent_color_hex"
                  value="<?= htmlspecialchars($s['brand_accent_color'] ?? '#e87722') ?>"
-                 placeholder="#e87722" style="width:120px"
-                 oninput="document.querySelector('[name=brand_accent_color]').value=this.value">
+                 placeholder="#e87722" maxlength="7" style="width:100px">
           <span style="font-size:.8rem;color:var(--color-text-muted)">Vista previa:
-            <a href="#" style="color:var(--color-brand)">enlace de ejemplo</a> ·
+            <a href="#" style="color:var(--color-brand)">enlace</a> ·
             <button type="button" class="btn btn-primary btn-sm" style="padding:.2rem .6rem;font-size:.8rem">botón</button>
           </span>
         </div>
       </div>
     </div>
-    <script>
-    document.querySelector('[name=brand_accent_color]')?.addEventListener('input', function(){
-      document.querySelector('[name=brand_accent_color_hex]').value = this.value;
-    });
-    </script>
   </div>
 </details>
 
@@ -132,85 +122,68 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 <details class="settings-section">
   <summary>🎓 Título de alumnos</summary>
   <div class="settings-body">
+
     <div class="form-group">
-      <label>Imagen de fondo del título (PNG apaisado)</label>
-      <input type="file" name="cert_bg" accept="image/png,image/jpeg">
-      <?php if(!empty($s['cert_bg_path'])): ?>
-        <img src="<?= BASE_URL . htmlspecialchars($s['cert_bg_path']) ?>" style="max-width:320px;margin-top:.5rem;border-radius:6px;border:1px solid var(--color-border)" alt="Fondo título">
-      <?php endif; ?>
+      <label>Imagen de fondo del título (PNG apaisado recomendado)</label>
+      <input type="file" name="cert_bg" accept="image/png,image/jpeg" id="cert-bg-input">
+      <?php
+        // Mostrar preview de la imagen ya guardada
+        $certBgUrl = '';
+        if (!empty($s['cert_bg_path'])) {
+            // cert_bg_path se almacena como /uploads/certificates/background.png
+            // BASE_URL ya contiene el dominio
+            $certBgUrl = rtrim(BASE_URL, '/') . $s['cert_bg_path'];
+        }
+      ?>
+      <div id="cert-bg-preview" style="margin-top:.75rem<?= $certBgUrl ? '' : ';display:none' ?>">
+        <img id="cert-bg-thumb" src="<?= htmlspecialchars($certBgUrl) ?>" alt="Fondo título actual"
+             style="max-width:320px;border-radius:6px;border:1px solid var(--color-border)">
+        <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.3rem">Imagen actual guardada</p>
+      </div>
     </div>
+
     <div class="form-grid">
       <div class="form-group"><label>Posición X (px)</label><input type="number" name="cert_name_x" value="<?= htmlspecialchars($s['cert_name_x'] ?? '400') ?>"></div>
       <div class="form-group"><label>Posición Y (px)</label><input type="number" name="cert_name_y" value="<?= htmlspecialchars($s['cert_name_y'] ?? '300') ?>"></div>
       <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="cert_name_fontsize" value="<?= htmlspecialchars($s['cert_name_fontsize'] ?? '36') ?>"></div>
-      <div class="form-group"><label>Color texto (hex)</label><input type="color" name="cert_name_color" value="<?= htmlspecialchars($s['cert_name_color'] ?? '#000000') ?>"></div>
+      <div class="form-group">
+        <label>Color texto</label>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <input type="color" id="pick-cert-color" name="cert_name_color"
+                 value="<?= htmlspecialchars($s['cert_name_color'] ?? '#000000') ?>"
+                 style="width:44px;height:36px;padding:2px;border-radius:6px;cursor:pointer;border:1px solid var(--color-border)">
+          <input type="text" id="hex-cert-color"
+                 value="<?= htmlspecialchars($s['cert_name_color'] ?? '#000000') ?>"
+                 placeholder="#000000" maxlength="7" style="width:90px">
+        </div>
+      </div>
     </div>
+
     <div style="margin-top:1rem">
       <button type="button" class="btn btn-secondary" onclick="previewCertificate()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:.3rem"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         Vista previa del título
       </button>
     </div>
-    <div id="cert-preview-wrap" style="display:none;margin-top:1rem;position:relative">
+
+    <div id="cert-preview-wrap" style="display:none;margin-top:1rem">
       <canvas id="cert-canvas" style="max-width:100%;border-radius:8px;border:1px solid var(--color-border);box-shadow:var(--shadow-md)"></canvas>
-      <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.5rem">Vista previa con nombre de ejemplo · Ajusta las coordenadas y pulsa de nuevo.</p>
+      <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.5rem">
+        Vista previa con nombre de ejemplo &middot; Ajusta coordenadas y pulsa de nuevo.
+      </p>
     </div>
-    <script>
-    function previewCertificate() {
-      var bgPath   = <?= json_encode(!empty($s['cert_bg_path']) ? BASE_URL . $s['cert_bg_path'] : '') ?>;
-      var posX     = parseInt(document.querySelector('[name=cert_name_x]').value) || 400;
-      var posY     = parseInt(document.querySelector('[name=cert_name_y]').value) || 300;
-      var fontSize = parseInt(document.querySelector('[name=cert_name_fontsize]').value) || 36;
-      var color    = document.querySelector('[name=cert_name_color]').value || '#000000';
-      var wrap     = document.getElementById('cert-preview-wrap');
-      var canvas   = document.getElementById('cert-canvas');
-      var ctx      = canvas.getContext('2d');
-      function drawName() {
-        ctx.font = 'bold ' + fontSize + 'px Inter, sans-serif';
-        ctx.fillStyle = color;
-        ctx.textAlign = 'left';
-        ctx.fillText('Alumno/a de Ejemplo', posX, posY);
-      }
-      wrap.style.display = 'block';
-      if (bgPath) {
-        var img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = function() {
-          canvas.width  = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          ctx.drawImage(img, 0, 0);
-          drawName();
-        };
-        img.onerror = function() {
-          canvas.width = 1200; canvas.height = 600;
-          ctx.fillStyle = '#f3f3f3'; ctx.fillRect(0,0,1200,600);
-          ctx.fillStyle = '#aaa'; ctx.font = '24px Inter,sans-serif'; ctx.textAlign='center';
-          ctx.fillText('(sin imagen de fondo)', 600, 300);
-          drawName();
-        };
-        img.src = bgPath;
-      } else {
-        canvas.width = 1200; canvas.height = 600;
-        ctx.fillStyle = '#f3f3f3'; ctx.fillRect(0,0,1200,600);
-        ctx.fillStyle = '#aaa'; ctx.font = '24px Inter,sans-serif'; ctx.textAlign='center';
-        ctx.fillText('(sin imagen de fondo — sube un PNG en el campo de arriba)', 600, 300);
-        drawName();
-      }
-    }
-    </script>
+
   </div>
 </details>
 
-<!-- ══ BOTÓN SUBMIT — dentro del form ══ -->
+<!-- BOTÓN SUBMIT dentro del form -->
 <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--color-border)">
   <button type="submit" class="btn btn-primary">💾 Guardar todos los ajustes</button>
 </div>
 
 </form><!-- FIN form principal -->
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- TOKENS API — form(s) independientes, FUERA del form principal -->
-<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TOKENS API — forms propios, fuera del form principal -->
 <details class="settings-section" style="margin-top:1.5rem">
   <summary>🔑 Tokens API</summary>
   <div class="settings-body">
@@ -230,16 +203,124 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
         </td>
       </tr>
       <?php endforeach; ?>
-      <?php if(empty($apiTokens)): ?><tr><td colspan="4" class="empty-row">Sin tokens generados</td></tr><?php endif; ?>
+      <?php if(empty($apiTokens)): ?>
+        <tr><td colspan="4" class="empty-row">Sin tokens generados</td></tr>
+      <?php endif; ?>
       </tbody>
     </table>
-
     <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/crear" style="display:flex;gap:.75rem;align-items:flex-end">
       <?= \Csrf::field() ?>
-      <div class="form-group" style="margin:0;flex:1"><label>Etiqueta del nuevo token</label><input type="text" name="label" required placeholder="Mi aplicación"></div>
+      <div class="form-group" style="margin:0;flex:1">
+        <label>Etiqueta del nuevo token</label>
+        <input type="text" name="label" required placeholder="Mi aplicación">
+      </div>
       <button type="submit" class="btn btn-primary">Generar token</button>
     </form>
   </div>
 </details>
+
+<script>
+// ── Color pickers con sincronización bidireccional ──────────────────────────
+function syncColorPair(pickerId, hexId) {
+  var picker = document.getElementById(pickerId);
+  var hex    = document.getElementById(hexId);
+  if (!picker || !hex) return;
+
+  picker.addEventListener('input', function() {
+    hex.value = this.value;
+  });
+  hex.addEventListener('input', function() {
+    var v = this.value.trim();
+    if (!v.startsWith('#')) v = '#' + v;
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+      picker.value = v;
+    }
+  });
+  // Sync hidden cert_name_color from hex companion
+  if (hexId === 'hex-cert-color') {
+    hex.addEventListener('input', function() {
+      picker.dispatchEvent(new Event('input'));
+    });
+  }
+}
+
+syncColorPair('pick-brand',      'hex-brand');
+syncColorPair('pick-cert-color', 'hex-cert-color');
+
+// Sync hex-cert-color -> cert_name_color picker (the actual submitted field)
+document.getElementById('hex-cert-color')?.addEventListener('input', function() {
+  var v = this.value.trim();
+  if (!v.startsWith('#')) v = '#' + v;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    document.getElementById('pick-cert-color').value = v;
+  }
+});
+
+// ── Preview PNG en el input file antes de guardar ───────────────────────────
+document.getElementById('cert-bg-input')?.addEventListener('change', function() {
+  var file = this.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var thumb = document.getElementById('cert-bg-thumb');
+    var wrap  = document.getElementById('cert-bg-preview');
+    if (thumb) { thumb.src = e.target.result; }
+    if (wrap)  { wrap.style.display = ''; }
+    // Reutilizar en el canvas preview si ya está visible
+    if (document.getElementById('cert-preview-wrap').style.display !== 'none') {
+      previewCertificate(e.target.result);
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── Canvas preview del título ───────────────────────────────────────────────
+function previewCertificate(overrideSrc) {
+  var savedBg  = <?= json_encode(!empty($s['cert_bg_path']) ? rtrim(BASE_URL, '/') . $s['cert_bg_path'] : '') ?>;
+  var bgSrc    = overrideSrc || savedBg || '';
+  var posX     = parseInt(document.querySelector('[name=cert_name_x]').value)     || 400;
+  var posY     = parseInt(document.querySelector('[name=cert_name_y]').value)     || 300;
+  var fontSize = parseInt(document.querySelector('[name=cert_name_fontsize]').value) || 36;
+  var color    = document.getElementById('pick-cert-color').value                || '#000000';
+  var wrap     = document.getElementById('cert-preview-wrap');
+  var canvas   = document.getElementById('cert-canvas');
+  var ctx      = canvas.getContext('2d');
+
+  wrap.style.display = 'block';
+
+  function drawName() {
+    ctx.font      = 'bold ' + fontSize + 'px Inter, sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText('Alumno/a de Ejemplo', posX, posY);
+  }
+
+  if (bgSrc) {
+    var img = new Image();
+    if (!overrideSrc) img.crossOrigin = 'anonymous'; // solo para URLs remotas
+    img.onload = function() {
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+      drawName();
+    };
+    img.onerror = function() {
+      drawPlaceholder(ctx, canvas);
+      drawName();
+    };
+    img.src = bgSrc;
+  } else {
+    drawPlaceholder(ctx, canvas);
+    drawName();
+  }
+}
+
+function drawPlaceholder(ctx, canvas) {
+  canvas.width = 1200; canvas.height = 600;
+  ctx.fillStyle = '#f3f0ec'; ctx.fillRect(0, 0, 1200, 600);
+  ctx.fillStyle = '#aaa'; ctx.font = '22px Inter,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('(sin imagen de fondo — sube un PNG en el campo de arriba)', 600, 300);
+}
+</script>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
