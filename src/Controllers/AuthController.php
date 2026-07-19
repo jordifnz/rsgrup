@@ -5,61 +5,58 @@ class AuthController
 {
     public function showLogin(array $params = []): void
     {
-        if (isset($_SESSION['user_id'])) {
-            $redirect = $_SESSION['intended_url'] ?? BASE_URL . '/dashboard';
-            unset($_SESSION['intended_url']);
-            header('Location: ' . $redirect);
-            exit;
+        if (isLoggedIn()) {
+            redirect(getLoginRedirect('/dashboard'));
         }
-        $error = $_SESSION['flash_error'] ?? null;
-        unset($_SESSION['flash_error']);
+
         include BASE_PATH . '/templates/auth/login.php';
     }
 
     public function login(array $params = []): void
     {
         Csrf::verify();
+
         $email    = Sanitize::email($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
-        $user = UserModel::findByEmail($email);
-
-        // La columna en BD es `password`, no `password_hash`
-        if (!$user || empty($user['password']) || !password_verify($password, $user['password'])) {
-            ActivityLogger::log(null, 'login_failed', "Intento fallido: {$email}", $email);
-            $_SESSION['flash_error'] = 'Email o contraseña incorrectos.';
-            header('Location: ' . BASE_URL . '/login');
-            exit;
+        if (!$email || !$password) {
+            flash('error', ['type' => 'error', 'message' => 'Introduce email y contraseña.']);
+            redirect('/login');
         }
 
-        // Start session
-        $_SESSION['user_id']   = $user['id'];
-        $_SESSION['user_role'] = $user['role'];
-        $_SESSION['user_name'] = $user['name'];
+        $user = UserModel::findByEmail($email);
+
+        if (!$user || empty($user['password']) || !password_verify($password, $user['password'])) {
+            ActivityLogger::log(null, 'login_failed', "Intento fallido: {$email}");
+            flash('error', ['type' => 'error', 'message' => 'Email o contraseña incorrectos.']);
+            redirect('/login');
+        }
+
+        // Iniciar sesión con la función central de session.php
+        loginUser($user);
 
         ActivityLogger::log($user['id'], 'login_success', 'Login satisfactorio');
 
-        $redirect = $_SESSION['intended_url'] ?? BASE_URL . '/dashboard';
-        unset($_SESSION['intended_url']);
-        header('Location: ' . $redirect);
-        exit;
+        redirect(getLoginRedirect('/dashboard'));
     }
 
     public function showRegister(array $params = []): void
     {
-        if (isset($_SESSION['user_id'])) {
-            header('Location: ' . BASE_URL . '/dashboard');
-            exit;
+        if (isLoggedIn()) {
+            redirect('/dashboard');
         }
-        $error = $_SESSION['flash_error']  ?? null;
-        $old   = $_SESSION['flash_old']    ?? [];
-        unset($_SESSION['flash_error'], $_SESSION['flash_old']);
+
         include BASE_PATH . '/templates/auth/register.php';
     }
 
     public function register(array $params = []): void
     {
         Csrf::verify();
+
+        // Honeypot anti-bot
+        if (!empty($_POST['website'])) {
+            redirect('/registro');
+        }
 
         $name      = Sanitize::string($_POST['name']        ?? '');
         $surnames  = Sanitize::string($_POST['surnames']    ?? '');
@@ -74,25 +71,18 @@ class AuthController
         $password  = $_POST['password']  ?? '';
         $password2 = $_POST['password2'] ?? '';
 
-        // Honeypot anti-bot
-        if (!empty($_POST['website'])) {
-            header('Location: ' . BASE_URL . '/registro');
-            exit;
-        }
-
         $errors = [];
-        if (!$name)                             $errors[] = 'El nombre es obligatorio.';
-        if (!$surnames)                         $errors[] = 'Los apellidos son obligatorios.';
-        if (!Sanitize::validateEmail($email))   $errors[] = 'El email no es válido.';
-        if (!Sanitize::validatePassword($password)) $errors[] = 'La contraseña debe tener mínimo 8 caracteres.';
-        if ($password !== $password2)           $errors[] = 'Las contraseñas no coinciden.';
-        if (UserModel::findByEmail($email))     $errors[] = 'Ese email ya está registrado.';
+        if (!$name)                                  $errors[] = 'El nombre es obligatorio.';
+        if (!$surnames)                              $errors[] = 'Los apellidos son obligatorios.';
+        if (!Sanitize::validateEmail($email))        $errors[] = 'El email no es válido.';
+        if (!Sanitize::validatePassword($password))  $errors[] = 'La contraseña debe tener mínimo 8 caracteres.';
+        if ($password !== $password2)                $errors[] = 'Las contraseñas no coinciden.';
+        if (UserModel::findByEmail($email))          $errors[] = 'Ese email ya está registrado.';
 
         if ($errors) {
-            $_SESSION['flash_error'] = implode('<br>', $errors);
-            $_SESSION['flash_old']   = $_POST;
-            header('Location: ' . BASE_URL . '/registro');
-            exit;
+            flash('error', ['type' => 'error', 'message' => implode('<br>', $errors)]);
+            flash('old',   $_POST);
+            redirect('/registro');
         }
 
         $userId = UserModel::create([
@@ -112,22 +102,18 @@ class AuthController
 
         ActivityLogger::log($userId, 'user_registered', "Nuevo registro: {$email}");
 
-        $_SESSION['user_id']   = $userId;
-        $_SESSION['user_role'] = 'alumno';
-        $_SESSION['user_name'] = $name;
+        // Cargar el usuario recién creado para tener todos los campos
+        $user = UserModel::findById($userId);
+        loginUser($user);
 
-        $redirect = $_SESSION['intended_url'] ?? BASE_URL . '/dashboard';
-        unset($_SESSION['intended_url']);
-        header('Location: ' . $redirect);
-        exit;
+        redirect(getLoginRedirect('/dashboard'));
     }
 
     public function logout(array $params = []): void
     {
         $userId = $_SESSION['user_id'] ?? null;
         ActivityLogger::log($userId, 'logout', 'Sesión cerrada');
-        session_destroy();
-        header('Location: ' . BASE_URL . '/login');
-        exit;
+        logoutUser();
+        redirect('/login');
     }
 }
