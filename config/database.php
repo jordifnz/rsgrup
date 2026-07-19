@@ -28,7 +28,7 @@ class Database
         return self::$instance;
     }
 
-    // ── Helpers genéricos ───────────────────────────────────────────────────
+    // ── Helpers principales ────────────────────────────────────────────────
 
     public static function query(string $sql, array $params = []): PDOStatement
     {
@@ -37,15 +37,43 @@ class Database
         return $stmt;
     }
 
+    /** Todas las filas como array asociativo. */
     public static function fetchAll(string $sql, array $params = []): array
     {
         return self::query($sql, $params)->fetchAll();
     }
 
+    /** Primera fila o false. */
     public static function fetchOne(string $sql, array $params = []): array|false
     {
         return self::query($sql, $params)->fetch();
     }
+
+    /** Alias de fetchOne() — compatibilidad con modelos. */
+    public static function fetch(string $sql, array $params = []): array|false
+    {
+        return self::fetchOne($sql, $params);
+    }
+
+    /** Ejecuta INSERT / UPDATE / DELETE. Devuelve rowCount. */
+    public static function execute(string $sql, array $params = []): int
+    {
+        return self::query($sql, $params)->rowCount();
+    }
+
+    /** Valor de la primera columna de la primera fila (p.ej. COUNT). */
+    public static function fetchColumn(string $sql, array $params = []): mixed
+    {
+        return self::query($sql, $params)->fetchColumn();
+    }
+
+    /** Último ID insertado. */
+    public static function lastInsertId(): string
+    {
+        return self::getInstance()->lastInsertId();
+    }
+
+    // ── CRUD helpers ───────────────────────────────────────────────────────
 
     public static function insert(string $table, array $data): int|string
     {
@@ -78,13 +106,11 @@ class Database
     public static function commit(): void           { self::getInstance()->commit(); }
     public static function rollback(): void         { self::getInstance()->rollBack(); }
 
-    // ── Settings helpers ──────────────────────────────────────────────────
+    // ── Settings helpers ────────────────────────────────────────────────────
 
     /**
-     * Obtiene el valor de un setting por su clave.
-     * Devuelve $default si la clave no existe o está vacía.
-     *
-     * Uso:  Database::getSetting('whatsapp_contact_number', '')
+     * Lee un setting. Devuelve $default si no existe o está vacío.
+     * Uso: Database::getSetting('whatsapp_contact_number', '')
      */
     public static function getSetting(string $key, mixed $default = null): mixed
     {
@@ -98,18 +124,13 @@ class Database
             }
             return $row['setting_value'];
         } catch (\Throwable) {
-            // Si la tabla aún no existe (primera instalación antes del SQL), devolver default
             return $default;
         }
     }
 
     /**
-     * Obtiene múltiples settings de una vez como array asociativo.
-     * Si se pasa un array de claves, solo devuelve esas.
-     * Si no se pasa nada, devuelve todos los settings.
-     *
-     * Uso:  $cfg = Database::getSettings(['smtp_host','smtp_port','smtp_user']);
-     *       $all = Database::getSettings();
+     * Lee varios settings. Sin args devuelve todos.
+     * Uso: $cfg = Database::getSettings(['smtp_host', 'smtp_port']);
      */
     public static function getSettings(array $keys = []): array
     {
@@ -117,9 +138,9 @@ class Database
             if (empty($keys)) {
                 $rows = self::fetchAll('SELECT setting_key, setting_value FROM rsgrup_settings');
             } else {
-                $placeholders = implode(',', array_fill(0, count($keys), '?'));
+                $ph   = implode(',', array_fill(0, count($keys), '?'));
                 $rows = self::fetchAll(
-                    "SELECT setting_key, setting_value FROM rsgrup_settings WHERE setting_key IN ({$placeholders})",
+                    "SELECT setting_key, setting_value FROM rsgrup_settings WHERE setting_key IN ({$ph})",
                     $keys
                 );
             }
@@ -127,11 +148,8 @@ class Database
             foreach ($rows as $row) {
                 $result[$row['setting_key']] = $row['setting_value'];
             }
-            // Rellenar con null las claves pedidas que no existan en BD
             foreach ($keys as $k) {
-                if (!array_key_exists($k, $result)) {
-                    $result[$k] = null;
-                }
+                if (!array_key_exists($k, $result)) $result[$k] = null;
             }
             return $result;
         } catch (\Throwable) {
@@ -140,9 +158,8 @@ class Database
     }
 
     /**
-     * Guarda (INSERT o UPDATE) un setting.
-     *
-     * Uso:  Database::setSetting('smtp_host', 'smtp.gmail.com')
+     * Guarda o actualiza un setting.
+     * Uso: Database::setSetting('smtp_host', 'smtp.gmail.com')
      */
     public static function setSetting(string $key, mixed $value): void
     {
