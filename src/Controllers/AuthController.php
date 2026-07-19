@@ -24,7 +24,8 @@ class AuthController
 
         $user = UserModel::findByEmail($email);
 
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        // La columna en BD es `password`, no `password_hash`
+        if (!$user || empty($user['password']) || !password_verify($password, $user['password'])) {
             ActivityLogger::log(null, 'login_failed', "Intento fallido: {$email}", $email);
             $_SESSION['flash_error'] = 'Email o contraseña incorrectos.';
             header('Location: ' . BASE_URL . '/login');
@@ -50,8 +51,8 @@ class AuthController
             header('Location: ' . BASE_URL . '/dashboard');
             exit;
         }
-        $error  = $_SESSION['flash_error']  ?? null;
-        $old    = $_SESSION['flash_old']    ?? [];
+        $error = $_SESSION['flash_error']  ?? null;
+        $old   = $_SESSION['flash_old']    ?? [];
         unset($_SESSION['flash_error'], $_SESSION['flash_old']);
         include BASE_PATH . '/templates/auth/register.php';
     }
@@ -60,18 +61,18 @@ class AuthController
     {
         Csrf::verify();
 
-        $name       = Sanitize::string($_POST['name'] ?? '');
-        $surnames   = Sanitize::string($_POST['surnames'] ?? '');
-        $email      = Sanitize::email($_POST['email'] ?? '');
-        $phone      = Sanitize::string($_POST['phone'] ?? '', 20);
-        $address    = Sanitize::string($_POST['address'] ?? '');
-        $postal     = Sanitize::string($_POST['postal_code'] ?? '', 10);
-        $city       = Sanitize::string($_POST['city'] ?? '');
-        $province   = Sanitize::string($_POST['province'] ?? '');
-        $instagram  = Sanitize::string($_POST['instagram'] ?? '', 100);
-        $tiktok     = Sanitize::string($_POST['tiktok'] ?? '', 100);
-        $password   = $_POST['password'] ?? '';
-        $password2  = $_POST['password2'] ?? '';
+        $name      = Sanitize::string($_POST['name']        ?? '');
+        $surnames  = Sanitize::string($_POST['surnames']    ?? '');
+        $email     = Sanitize::email($_POST['email']        ?? '');
+        $phone     = Sanitize::string($_POST['phone']       ?? '', 20);
+        $address   = Sanitize::string($_POST['address']     ?? '');
+        $postal    = Sanitize::string($_POST['postal_code'] ?? '', 10);
+        $city      = Sanitize::string($_POST['city']        ?? '');
+        $province  = Sanitize::string($_POST['province']    ?? '');
+        $instagram = Sanitize::string($_POST['instagram']   ?? '', 100);
+        $tiktok    = Sanitize::string($_POST['tiktok']      ?? '', 100);
+        $password  = $_POST['password']  ?? '';
+        $password2 = $_POST['password2'] ?? '';
 
         // Honeypot anti-bot
         if (!empty($_POST['website'])) {
@@ -80,12 +81,12 @@ class AuthController
         }
 
         $errors = [];
-        if (!$name)    $errors[] = 'El nombre es obligatorio.';
-        if (!$surnames) $errors[] = 'Los apellidos son obligatorios.';
-        if (!Sanitize::validateEmail($email)) $errors[] = 'El email no es válido.';
+        if (!$name)                             $errors[] = 'El nombre es obligatorio.';
+        if (!$surnames)                         $errors[] = 'Los apellidos son obligatorios.';
+        if (!Sanitize::validateEmail($email))   $errors[] = 'El email no es válido.';
         if (!Sanitize::validatePassword($password)) $errors[] = 'La contraseña debe tener mínimo 8 caracteres.';
-        if ($password !== $password2) $errors[] = 'Las contraseñas no coinciden.';
-        if (UserModel::findByEmail($email)) $errors[] = 'Ese email ya está registrado.';
+        if ($password !== $password2)           $errors[] = 'Las contraseñas no coinciden.';
+        if (UserModel::findByEmail($email))     $errors[] = 'Ese email ya está registrado.';
 
         if ($errors) {
             $_SESSION['flash_error'] = implode('<br>', $errors);

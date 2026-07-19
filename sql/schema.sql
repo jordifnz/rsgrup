@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `rsgrup_users` (
   `name`          VARCHAR(100)    NOT NULL,
   `surnames`      VARCHAR(150)    NOT NULL DEFAULT '',
   `email`         VARCHAR(191)    NOT NULL,
-  `password`      VARCHAR(255)    NOT NULL,
+  `password`      VARCHAR(255)    NOT NULL COMMENT 'password_hash de PHP',
   `phone`         VARCHAR(30)     DEFAULT NULL,
   `address`       VARCHAR(255)    DEFAULT NULL,
   `postal_code`   VARCHAR(10)     DEFAULT NULL,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS `rsgrup_exam_attempt_answers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
--- rsgrup_settings
+-- rsgrup_settings  (columnas: `key` y `value`)
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `rsgrup_settings` (
   `id`      INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -228,13 +228,13 @@ CREATE TABLE IF NOT EXISTS `rsgrup_api_tokens` (
 CREATE TABLE IF NOT EXISTS `rsgrup_activity_log` (
   `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `user_id`     INT UNSIGNED  DEFAULT NULL,
-  `action`      VARCHAR(100)  NOT NULL COMMENT 'login_ok, login_fail, register, enroll, exam_submit, etc.',
+  `action`      VARCHAR(100)  NOT NULL COMMENT 'login_ok, login_fail, register, enroll, exam_submit...',
   `description` VARCHAR(500)  DEFAULT NULL,
   `ip_address`  VARCHAR(45)   DEFAULT NULL,
   `user_agent`  VARCHAR(300)  DEFAULT NULL,
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `fk_log_user`  (`user_id`),
+  KEY `fk_log_user`    (`user_id`),
   KEY `idx_log_action` (`action`),
   CONSTRAINT `fk_log_user` FOREIGN KEY (`user_id`) REFERENCES `rsgrup_users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -244,9 +244,10 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ==========================================================
 -- INSTRUCCIONES DE INSTALACIÓN
 -- ==========================================================
--- 1. Conectar: mysql -h 82.223.107.197 -P 3306 -u adminrsgrup -p dbapprsgrup
--- 2. Ejecutar: SOURCE /ruta/al/proyecto/sql/schema.sql;
--- 3. Crear primer admin manualmente:
---    INSERT INTO rsgrup_users (name,surnames,email,password,role)
---    VALUES ('Admin','RSGrup','admin@rsgrup.com', SHA2('TuPassword123',256) ,'admin');
---    NOTA: La app usa password_hash/password_verify de PHP, usar desde registro web.
+-- 1. mysql -h 82.223.107.197 -P 3306 -u adminrsgrup -p dbapprsgrup
+-- 2. SOURCE /ruta/proyecto/sql/schema.sql;
+-- 3. Crear primer admin (después de arrancar la app, usar /registro):
+--    INSERT INTO rsgrup_users (name, surnames, email, password, role)
+--    VALUES ('Admin','RSGrup','admin@tudominio.com',
+--            '$2y$12$HASH_GENERADO_CON_password_hash','admin');
+--    — O bien: registrarse por web y luego: UPDATE rsgrup_users SET role='admin' WHERE email='...';

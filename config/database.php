@@ -28,7 +28,7 @@ class Database
         return self::$instance;
     }
 
-    // ── Helpers principales ────────────────────────────────────────────────
+    // ── Helpers principales ──────────────────────────────────────────
 
     public static function query(string $sql, array $params = []): PDOStatement
     {
@@ -73,7 +73,7 @@ class Database
         return self::getInstance()->lastInsertId();
     }
 
-    // ── CRUD helpers ───────────────────────────────────────────────────────
+    // ── CRUD helpers ─────────────────────────────────────────────────
 
     public static function insert(string $table, array $data): int|string
     {
@@ -92,8 +92,7 @@ class Database
 
     public static function delete(string $table, string $where, array $params = []): int
     {
-        $stmt = self::query("DELETE FROM `{$table}` WHERE {$where}", $params);
-        return $stmt->rowCount();
+        return self::query("DELETE FROM `{$table}` WHERE {$where}", $params)->rowCount();
     }
 
     public static function count(string $table, string $where = '1', array $params = []): int
@@ -106,47 +105,40 @@ class Database
     public static function commit(): void           { self::getInstance()->commit(); }
     public static function rollback(): void         { self::getInstance()->rollBack(); }
 
-    // ── Settings helpers ────────────────────────────────────────────────────
+    // ── Settings helpers ──────────────────────────────────────────────
+    // NOTA: rsgrup_settings usa columnas `key` y `value` (según schema.sql)
 
-    /**
-     * Lee un setting. Devuelve $default si no existe o está vacío.
-     * Uso: Database::getSetting('whatsapp_contact_number', '')
-     */
     public static function getSetting(string $key, mixed $default = null): mixed
     {
         try {
             $row = self::fetchOne(
-                'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ? LIMIT 1',
+                'SELECT `value` FROM rsgrup_settings WHERE `key` = ? LIMIT 1',
                 [$key]
             );
-            if ($row === false || $row['setting_value'] === null || $row['setting_value'] === '') {
+            if ($row === false || $row['value'] === null || $row['value'] === '') {
                 return $default;
             }
-            return $row['setting_value'];
+            return $row['value'];
         } catch (\Throwable) {
             return $default;
         }
     }
 
-    /**
-     * Lee varios settings. Sin args devuelve todos.
-     * Uso: $cfg = Database::getSettings(['smtp_host', 'smtp_port']);
-     */
     public static function getSettings(array $keys = []): array
     {
         try {
             if (empty($keys)) {
-                $rows = self::fetchAll('SELECT setting_key, setting_value FROM rsgrup_settings');
+                $rows = self::fetchAll('SELECT `key`, `value` FROM rsgrup_settings');
             } else {
                 $ph   = implode(',', array_fill(0, count($keys), '?'));
                 $rows = self::fetchAll(
-                    "SELECT setting_key, setting_value FROM rsgrup_settings WHERE setting_key IN ({$ph})",
+                    "SELECT `key`, `value` FROM rsgrup_settings WHERE `key` IN ({$ph})",
                     $keys
                 );
             }
             $result = [];
             foreach ($rows as $row) {
-                $result[$row['setting_key']] = $row['setting_value'];
+                $result[$row['key']] = $row['value'];
             }
             foreach ($keys as $k) {
                 if (!array_key_exists($k, $result)) $result[$k] = null;
@@ -157,16 +149,11 @@ class Database
         }
     }
 
-    /**
-     * Guarda o actualiza un setting.
-     * Uso: Database::setSetting('smtp_host', 'smtp.gmail.com')
-     */
     public static function setSetting(string $key, mixed $value): void
     {
         self::query(
-            'INSERT INTO rsgrup_settings (setting_key, setting_value)
-             VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)',
+            'INSERT INTO rsgrup_settings (`key`, `value`) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)',
             [$key, $value]
         );
     }
