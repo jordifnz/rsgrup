@@ -13,7 +13,6 @@ function startSession(): void
             'samesite' => 'Lax',
         ]);
         session_start();
-        // Regenerate session ID periodically to prevent fixation
         if (!isset($_SESSION['_initiated'])) {
             session_regenerate_id(true);
             $_SESSION['_initiated'] = true;
@@ -26,15 +25,16 @@ function isLoggedIn(): bool
     return !empty($_SESSION['user_id']);
 }
 
-function currentUser(): array|null
+function currentUser(): ?array
 {
     if (!isLoggedIn()) return null;
     return [
-        'id'     => $_SESSION['user_id'],
-        'name'   => $_SESSION['user_name'] ?? '',
-        'email'  => $_SESSION['user_email'] ?? '',
-        'role'   => $_SESSION['user_role'] ?? ROLE_ALUMNO,
-        'avatar' => $_SESSION['user_avatar'] ?? null,
+        'id'       => $_SESSION['user_id'],
+        'name'     => $_SESSION['user_name']     ?? '',
+        'surnames' => $_SESSION['user_surnames'] ?? '',
+        'email'    => $_SESSION['user_email']    ?? '',
+        'role'     => $_SESSION['user_role']     ?? ROLE_ALUMNO,
+        'avatar'   => $_SESSION['user_avatar']   ?? null,
     ];
 }
 
@@ -50,7 +50,7 @@ function requireLogin(string $redirectTo = '/login'): void
         if ($referer && $referer !== '/login') {
             $_SESSION['login_redirect'] = $referer;
         }
-        redirect($redirectTo);
+        redirect(BASE_URL . $redirectTo);
     }
 }
 
@@ -58,18 +58,23 @@ function requireAdmin(): void
 {
     requireLogin();
     if (!isAdmin()) {
-        redirect('/dashboard');
+        redirect(BASE_URL . '/dashboard');
     }
 }
 
+/**
+ * Guarda datos del usuario en sesión.
+ * Acepta el array tal como lo devuelve la BD (columnas: id, name, surnames, email, role, avatar).
+ */
 function loginUser(array $user): void
 {
     session_regenerate_id(true);
-    $_SESSION['user_id']     = $user['id'];
-    $_SESSION['user_name']   = $user['nombre'] . ' ' . $user['apellidos'];
-    $_SESSION['user_email']  = $user['email'];
-    $_SESSION['user_role']   = $user['rol'];
-    $_SESSION['user_avatar'] = $user['avatar'] ?? null;
+    $_SESSION['user_id']       = $user['id'];
+    $_SESSION['user_name']     = $user['name']     ?? '';
+    $_SESSION['user_surnames'] = $user['surnames'] ?? '';
+    $_SESSION['user_email']    = $user['email']    ?? '';
+    $_SESSION['user_role']     = $user['role']     ?? ROLE_ALUMNO;
+    $_SESSION['user_avatar']   = $user['avatar']   ?? null;
 }
 
 function logoutUser(): void
@@ -77,8 +82,11 @@ function logoutUser(): void
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $p = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        setcookie(
+            session_name(), '',
+            time() - 42000,
+            $p['path'], $p['domain'] ?? '', $p['secure'], $p['httponly']
+        );
     }
     session_destroy();
 }
@@ -96,6 +104,10 @@ function flash(string $key, mixed $value = null): mixed
 
 function redirect(string $url): never
 {
+    // Si la URL no empieza por http, anteponer BASE_URL
+    if (!str_starts_with($url, 'http')) {
+        $url = BASE_URL . $url;
+    }
     header('Location: ' . $url);
     exit;
 }
