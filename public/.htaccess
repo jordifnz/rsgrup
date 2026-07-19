@@ -66,8 +66,8 @@ RewriteRule ^ index.php [QSA,L]
     # HSTS: activa SOLO cuando tengas SSL estable
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-    # CSP — todos los CDNs usados en el proyecto
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self'; base-uri 'self';"
+    # CSP — connect-src incluye jsdelivr (sourcemaps) y fonts.gstatic.com
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self'; base-uri 'self';"
 
     Header always unset Server
     Header always unset X-Powered-By
