@@ -1,130 +1,122 @@
 <?php
 // templates/admin/layout_admin.php
-if (!defined('BASE_PATH')) { header('Location: /'); exit; }
-requireAdmin();
-$robots    = 'noindex,nofollow';
-$metaTitle = ($metaTitle ?? 'Admin') . ' — RSGrup Admin';
-
-// Leer nombre del usuario admin para el topbar
-$adminName = trim(($_SESSION['user_name'] ?? '') . ' ' . ($_SESSION['user_surnames'] ?? ''));
-$adminInitials = strtoupper(
-    mb_substr($_SESSION['user_name']     ?? '', 0, 1) .
-    mb_substr($_SESSION['user_surnames'] ?? '', 0, 1)
-);
+if (session_status() === PHP_SESSION_NONE) session_start();
+requireLogin(); requireAdmin();
+$metaTitle = $metaTitle ?? 'Admin';
+$robots    = $robots    ?? 'noindex,nofollow';
 $currentUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$baseAdmin  = rtrim(BASE_URL, '/') . '/admin';
+
+// Leer color de acento desde settings
+$accentColor = '#e87722'; // naranja RSGrup por defecto
+try {
+  $accentRow = Database::fetchRow("SELECT `value` FROM rsgrup_settings WHERE `key`='brand_accent_color'");
+  if ($accentRow && !empty($accentRow['value'])) $accentColor = $accentRow['value'];
+} catch(\Throwable $e) {}
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= htmlspecialchars($metaTitle) ?></title>
-  <meta name="robots" content="noindex,nofollow">
-  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=cabinet-grotesk@700,800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-  <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
-  <script>
-    // Tema: leer preferencia guardada o usar sistema
-    (function(){
-      var saved = localStorage.getItem('rsgrup-theme');
-      var preferred = saved || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', preferred);
-    })();
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="<?= $robots ?>">
+<title><?= htmlspecialchars($metaTitle) ?> | RSGrup Admin</title>
+<script>
+(function(){
+  var t = localStorage.getItem('rsgrup-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
+<!-- Acento de marca dinámico -->
+<style>
+  :root {
+    --color-brand: <?= htmlspecialchars($accentColor) ?>;
+    --color-brand-hover: color-mix(in srgb, <?= htmlspecialchars($accentColor) ?> 80%, #000);
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<!-- TinyMCE CDN -->
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+window._tinymceConfig = {
+  selector: '.wysiwyg',
+  height: 300,
+  menubar: false,
+  plugins: 'lists link image code',
+  toolbar: 'bold italic underline | bullist numlist | link | code',
+  promotion: false
+};
+</script>
 </head>
-<body class="admin-body">
+<body>
 <div class="admin-layout">
 
-  <!-- ===== SIDEBAR ===== -->
-  <aside class="admin-sidebar" aria-label="Navegación admin">
-
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
     <div class="sidebar-logo">
-      <a href="<?= BASE_URL ?>/admin">
-        <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="RSGrup" width="140" height="70" loading="eager">
-      </a>
+      <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="RSGrup" height="48">
     </div>
-
-    <nav class="sidebar-nav" aria-label="Menú admin">
-
-      <?php
-      $navItems = [
-        ['href' => '/admin',            'label' => 'Dashboard', 'icon' => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'],
-        ['href' => '/admin/cursos',     'label' => 'Cursos',    'icon' => '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>'],
-        ['href' => '/admin/entregas',   'label' => 'Entregas',  'icon' => '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'],
-        ['href' => '/admin/examenes',   'label' => 'Exámenes',  'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>'],
-        ['href' => '/admin/usuarios',   'label' => 'Usuarios',  'icon' => '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>'],
-        ['href' => '/admin/actividad',  'label' => 'Actividad', 'icon' => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'],
-        ['href' => '/admin/settings',   'label' => 'Settings',  'icon' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>'],
-      ];
-      foreach ($navItems as $item):
-        $fullHref = BASE_URL . $item['href'];
-        // Marcar activo: exact match para /admin, prefix para el resto
-        if ($item['href'] === '/admin') {
-            $isActive = ($currentUri === parse_url($fullHref, PHP_URL_PATH));
-        } else {
-            $isActive = str_starts_with($currentUri, parse_url($fullHref, PHP_URL_PATH));
-        }
-      ?>
-      <a href="<?= $fullHref ?>" class="sidebar-link <?= $isActive ? 'active' : '' ?>" aria-current="<?= $isActive ? 'page' : 'false' ?>">
-        <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?= $item['icon'] ?></svg>
-        <span><?= $item['label'] ?></span>
+    <nav class="sidebar-nav">
+      <a href="<?= BASE_URL ?>/admin" class="sidebar-link <?= $currentUri==='/admin'||$currentUri==='/admin/'?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
       </a>
-      <?php endforeach; ?>
-
+      <a href="<?= BASE_URL ?>/admin/cursos" class="sidebar-link <?= str_starts_with($currentUri,'/admin/cursos')||str_starts_with($currentUri,BASE_PATH.'/admin/cursos')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Cursos
+      </a>
+      <a href="<?= BASE_URL ?>/admin/entregas" class="sidebar-link <?= str_starts_with($currentUri,'/admin/entregas')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Entregas
+      </a>
+      <a href="<?= BASE_URL ?>/admin/examenes" class="sidebar-link <?= str_starts_with($currentUri,'/admin/examenes')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Exámenes
+      </a>
+      <a href="<?= BASE_URL ?>/admin/usuarios" class="sidebar-link <?= str_starts_with($currentUri,'/admin/usuarios')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Usuarios
+      </a>
+      <a href="<?= BASE_URL ?>/admin/actividad" class="sidebar-link <?= str_starts_with($currentUri,'/admin/actividad')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Actividad
+      </a>
+      <a href="<?= BASE_URL ?>/admin/settings" class="sidebar-link <?= str_starts_with($currentUri,'/admin/settings')?'active':'' ?>">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Ajustes
+      </a>
     </nav>
-
     <div class="sidebar-footer">
-      <!-- Toggle tema -->
-      <button id="theme-toggle" class="sidebar-theme-btn" aria-label="Cambiar tema claro/oscuro">
-        <svg id="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        <svg id="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <span id="theme-label">Tema oscuro</span>
-      </button>
-      <!-- Salir -->
-      <form action="<?= BASE_URL ?>/logout" method="POST" style="margin:0">
-        <?= Csrf::field() ?>
-        <button type="submit" class="sidebar-logout-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span>Salir</span>
+      <form method="POST" action="<?= BASE_URL ?>/logout">
+        <?= \Csrf::field() ?>
+        <button type="submit" class="sidebar-link w-full" style="border:none;cursor:pointer;background:transparent;">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
         </button>
       </form>
     </div>
-
   </aside>
 
-  <!-- ===== MAIN ===== -->
+  <!-- Main -->
   <div class="admin-main">
-
-    <!-- Topbar -->
     <header class="admin-topbar">
-      <div class="admin-topbar__left">
-        <?php if ($currentUri !== parse_url(BASE_URL . '/admin', PHP_URL_PATH)): ?>
-        <a href="javascript:history.back()" class="btn-back" aria-label="Volver">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      <?php if ($currentUri !== '/admin' && $currentUri !== '/admin/'): ?>
+        <a href="javascript:history.back()" class="btn-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           Volver
         </a>
-        <?php endif; ?>
-        <h1 class="admin-topbar__title"><?= htmlspecialchars($metaTitle) ?></h1>
-      </div>
-      <div class="admin-topbar__right">
-        <?php if (!empty($_SESSION['user_avatar'])): ?>
-          <img src="<?= BASE_URL . htmlspecialchars($_SESSION['user_avatar']) ?>" class="avatar-img avatar-sm" alt="Avatar">
-        <?php else: ?>
-          <div class="avatar-initials avatar-sm"><?= htmlspecialchars($adminInitials) ?></div>
-        <?php endif; ?>
-        <span class="admin-topbar__name"><?= htmlspecialchars($adminName) ?></span>
+      <?php endif; ?>
+      <span class="topbar-title"><?= htmlspecialchars($metaTitle) ?></span>
+      <div class="topbar-actions">
+        <button id="theme-toggle" aria-label="Cambiar tema" class="btn-icon">
+          <svg id="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span id="theme-label" class="sr-only">Tema oscuro</span>
+        </button>
+        <span class="topbar-user"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin') ?></span>
       </div>
     </header>
-
-    <?php
-    $flash = $_SESSION['flash'] ?? null;
-    unset($_SESSION['flash']);
-    if ($flash): ?>
-    <div class="flash flash--<?= htmlspecialchars($flash['type']) ?>" role="alert">
-      <?= htmlspecialchars($flash['message']) ?>
-      <button onclick="this.parentElement.remove()" class="flash-close" aria-label="Cerrar">&times;</button>
-    </div>
-    <?php endif; ?>
-
     <div class="admin-content">

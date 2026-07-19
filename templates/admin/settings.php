@@ -1,119 +1,263 @@
 <?php
-$metaTitle = 'Settings';
+$metaTitle = 'Ajustes';
 include BASE_PATH . '/templates/admin/layout_admin.php';
 ?>
-<h1>Configuración</h1>
-<form action="<?= BASE_URL ?>/admin/settings/guardar" method="POST" enctype="multipart/form-data" class="form">
-  <?= Csrf::field() ?>
 
-  <section class="settings-section">
-    <h2>PayPal</h2>
+<div class="section-header"><h1>Ajustes</h1></div>
+
+<?php if(!empty($_SESSION['flash_success'])): ?>
+  <div class="alert alert-success"><?= htmlspecialchars($_SESSION['flash_success']) ?></div>
+  <?php unset($_SESSION['flash_success']); ?>
+<?php endif; ?>
+
+<form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data">
+<?= \Csrf::field() ?>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- ESTILOS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section" open>
+  <summary>🎨 Estilos de la aplicación</summary>
+  <div class="settings-body">
+    <p class="settings-hint">Define los colores corporativos. Se aplican en botones, enlaces y elementos de acento en toda la aplicación.</p>
     <div class="form-grid">
-      <div class="form-group"><label>Modo</label>
+      <div class="form-group">
+        <label>Color de botones y enlaces (hex)</label>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <input type="color" name="brand_accent_color"
+                 value="<?= htmlspecialchars($s['brand_accent_color'] ?? '#e87722') ?>"
+                 style="width:48px;height:38px;padding:2px;border-radius:6px;cursor:pointer;border:1px solid var(--color-border)">
+          <input type="text" name="brand_accent_color_hex"
+                 value="<?= htmlspecialchars($s['brand_accent_color'] ?? '#e87722') ?>"
+                 placeholder="#e87722" style="width:120px"
+                 oninput="document.querySelector('[name=brand_accent_color]').value=this.value">
+          <span style="font-size:.8rem;color:var(--color-text-muted)">Vista previa: <a href="#" style="color:var(--color-brand)">enlace de ejemplo</a> · <button type="button" class="btn btn-primary btn-sm" style="padding:.2rem .6rem;font-size:.8rem">botón</button></span>
+        </div>
+      </div>
+    </div>
+    <script>
+    document.querySelector('[name=brand_accent_color]')?.addEventListener('input', function(){
+      document.querySelector('[name=brand_accent_color_hex]').value = this.value;
+    });
+    </script>
+  </div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAYPAL -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>💳 PayPal</summary>
+  <div class="settings-body">
+    <div class="form-grid">
+      <div class="form-group"><label>Client ID</label><input type="text" name="paypal_client_id" value="<?= htmlspecialchars($s['paypal_client_id'] ?? '') ?>"></div>
+      <div class="form-group"><label>Secret</label><input type="password" name="paypal_secret" value="<?= htmlspecialchars($s['paypal_secret'] ?? '') ?>"></div>
+      <div class="form-group">
+        <label>Modo</label>
         <select name="paypal_mode">
-          <option value="sandbox" <?= ($s['paypal_mode'] ?? '') === 'sandbox' ? 'selected' : '' ?>>Sandbox (pruebas)</option>
-          <option value="live" <?= ($s['paypal_mode'] ?? '') === 'live' ? 'selected' : '' ?>>Live (producción)</option>
+          <option value="sandbox" <?= ($s['paypal_mode']??'sandbox')==='sandbox'?'selected':'' ?>>Sandbox (pruebas)</option>
+          <option value="live" <?= ($s['paypal_mode']??'')==='live'?'selected':'' ?>>Live (producción)</option>
         </select>
       </div>
-      <div class="form-group"><label>Client ID</label><input type="text" name="paypal_client_id" value="<?= htmlspecialchars($s['paypal_client_id'] ?? '') ?>"></div>
-      <div class="form-group"><label>Client Secret</label><input type="password" name="paypal_client_secret" value="<?= htmlspecialchars($s['paypal_client_secret'] ?? '') ?>"></div>
     </div>
-  </section>
+  </div>
+</details>
 
-  <section class="settings-section">
-    <h2>SMTP (Email)</h2>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- SMTP -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>📧 Email (SMTP)</summary>
+  <div class="settings-body">
     <div class="form-grid">
-      <div class="form-group"><label>Host SMTP</label><input type="text" name="smtp_host" value="<?= htmlspecialchars($s['smtp_host'] ?? 'smtp.gmail.com') ?>"></div>
+      <div class="form-group"><label>Host SMTP</label><input type="text" name="smtp_host" value="<?= htmlspecialchars($s['smtp_host'] ?? '') ?>" placeholder="smtp.gmail.com"></div>
       <div class="form-group"><label>Puerto</label><input type="number" name="smtp_port" value="<?= htmlspecialchars($s['smtp_port'] ?? '587') ?>"></div>
-      <div class="form-group"><label>Usuario</label><input type="email" name="smtp_user" value="<?= htmlspecialchars($s['smtp_user'] ?? '') ?>"></div>
-      <div class="form-group"><label>Contraseña SMTP</label><input type="password" name="smtp_pass" value="<?= htmlspecialchars($s['smtp_pass'] ?? '') ?>"></div>
+      <div class="form-group"><label>Usuario</label><input type="text" name="smtp_user" value="<?= htmlspecialchars($s['smtp_user'] ?? '') ?>"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" name="smtp_password" value="<?= htmlspecialchars($s['smtp_password'] ?? '') ?>"></div>
       <div class="form-group"><label>Nombre remitente</label><input type="text" name="smtp_from_name" value="<?= htmlspecialchars($s['smtp_from_name'] ?? 'RSGrup') ?>"></div>
+      <div class="form-group"><label>Email remitente</label><input type="email" name="smtp_from_email" value="<?= htmlspecialchars($s['smtp_from_email'] ?? '') ?>"></div>
     </div>
-  </section>
+  </div>
+</details>
 
-  <section class="settings-section">
-    <h2>Evolution API (WhatsApp)</h2>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- EVOLUTION API -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>💬 Evolution API (WhatsApp)</summary>
+  <div class="settings-body">
     <div class="form-grid">
-      <div class="form-group"><label>URL Evolution API</label><input type="url" name="evolution_api_url" value="<?= htmlspecialchars($s['evolution_api_url'] ?? '') ?>"></div>
-      <div class="form-group"><label>API Token</label><input type="text" name="evolution_api_token" value="<?= htmlspecialchars($s['evolution_api_token'] ?? '') ?>"></div>
-      <div class="form-group"><label>Instancia (Instance Name)</label><input type="text" name="evolution_api_instance" value="<?= htmlspecialchars($s['evolution_api_instance'] ?? '') ?>"></div>
+      <div class="form-group"><label>URL Evolution API</label><input type="url" name="evolution_api_url" value="<?= htmlspecialchars($s['evolution_api_url'] ?? '') ?>" placeholder="https://api.tuservidor.com"></div>
+      <div class="form-group"><label>Token</label><input type="password" name="evolution_api_token" value="<?= htmlspecialchars($s['evolution_api_token'] ?? '') ?>"></div>
+      <div class="form-group"><label>Instancia</label><input type="text" name="evolution_instance" value="<?= htmlspecialchars($s['evolution_instance'] ?? '') ?>"></div>
     </div>
-  </section>
+  </div>
+</details>
 
-  <section class="settings-section">
-    <h2>WhatsApp de contacto</h2>
-    <div class="form-group" style="max-width:320px">
-      <label>Número (ej: 34612345678)</label>
-      <input type="text" name="whatsapp_contact_number" value="<?= htmlspecialchars($s['whatsapp_contact_number'] ?? '') ?>" placeholder="34612345678">
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- WHATSAPP CONTACTO -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>📱 WhatsApp de contacto</summary>
+  <div class="settings-body">
+    <div class="form-group" style="max-width:300px">
+      <label>Número (formato internacional, sin +)</label>
+      <input type="text" name="wa_contact_number" value="<?= htmlspecialchars($s['wa_contact_number'] ?? '') ?>" placeholder="34600000000">
     </div>
-  </section>
+  </div>
+</details>
 
-  <section class="settings-section">
-    <h2>Plantillas de notificación</h2>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PLANTILLAS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>✉️ Plantillas de notificación</summary>
+  <div class="settings-body">
     <div class="form-group">
-      <label>Plantilla e-mail (HTML)</label>
-      <p class="help-text">Variables disponibles: <code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{entrega}}</code> <code>{{curso}}</code> <code>{{precio}}</code> <code>{{fecha}}</code> <code>{{url_entrega}}</code></p>
-      <textarea name="email_template" class="wysiwyg-editor" rows="8"><?= htmlspecialchars($s['email_template'] ?? '') ?></textarea>
+      <label>Asunto email</label>
+      <input type="text" name="email_template_subject" value="<?= htmlspecialchars($s['email_template_subject'] ?? 'Inscripción confirmada: {{entrega_titulo}}') ?>">
+      <small>Variables: <code>{{alumno_nombre}}</code> <code>{{alumno_email}}</code> <code>{{entrega_titulo}}</code> <code>{{curso_titulo}}</code> <code>{{fecha}}</code></small>
+    </div>
+    <div class="form-group">
+      <label>Cuerpo email (HTML)</label>
+      <textarea name="email_template_body" class="wysiwyg" rows="8"><?= htmlspecialchars($s['email_template_body'] ?? '') ?></textarea>
     </div>
     <div class="form-group">
       <label>Plantilla WhatsApp (texto plano)</label>
-      <p class="help-text">Variables: <code>{{nombre}}</code> <code>{{entrega}}</code> <code>{{fecha}}</code></p>
-      <textarea name="whatsapp_template" rows="4" class="form-control" style="font-family:monospace"><?= htmlspecialchars($s['whatsapp_template'] ?? '') ?></textarea>
+      <textarea name="whatsapp_template" rows="4" style="font-family:monospace"><?= htmlspecialchars($s['whatsapp_template'] ?? '') ?></textarea>
+      <small>Variables: <code>{{alumno_nombre}}</code> <code>{{entrega_titulo}}</code> <code>{{fecha}}</code></small>
     </div>
-  </section>
-
-  <section class="settings-section">
-    <h2>Título de alumnos</h2>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>PNG de fondo (apaisado)</label>
-        <input type="file" name="certificate_bg" accept=".png">
-        <?php if (!empty($s['certificate_bg'])): ?><p class="text-sm text-muted">Actual: <code><?= htmlspecialchars($s['certificate_bg']) ?></code></p><?php endif; ?>
-      </div>
-      <div class="form-group"><label>Coord X nombre</label><input type="number" name="certificate_name_x" value="<?= htmlspecialchars($s['certificate_name_x'] ?? '400') ?>"></div>
-      <div class="form-group"><label>Coord Y nombre</label><input type="number" name="certificate_name_y" value="<?= htmlspecialchars($s['certificate_name_y'] ?? '300') ?>"></div>
-      <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="certificate_name_font_size" value="<?= htmlspecialchars($s['certificate_name_font_size'] ?? '48') ?>"></div>
-    </div>
-    <?php if (!empty($s['certificate_bg'])): ?>
-    <div class="cert-preview">
-      <p class="text-sm text-muted">Vista previa (marca roja = posición del nombre):</p>
-      <div style="position:relative;display:inline-block;max-width:100%;overflow:hidden">
-        <img src="<?= BASE_URL ?>/uploads/certificates/<?= htmlspecialchars($s['certificate_bg']) ?>" style="max-width:600px;width:100%" alt="Preview certificado">
-        <div style="position:absolute;left:<?= (int)($s['certificate_name_x'] ?? 400) ?>px;top:<?= (int)($s['certificate_name_y'] ?? 300) ?>px;color:red;font-size:<?= (int)($s['certificate_name_font_size'] ?? 48) ?>px;font-weight:bold;pointer-events:none;white-space:nowrap;line-height:1">Nombre Alumno</div>
-      </div>
-    </div>
-    <?php endif; ?>
-  </section>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Guardar configuración</button>
   </div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TOKENS API -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>🔑 Tokens API</summary>
+  <div class="settings-body">
+    <table class="data-table" style="margin-bottom:1rem">
+      <thead><tr><th>Etiqueta</th><th>Últimos caracteres</th><th>Creado</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($apiTokens as $t): ?>
+      <tr>
+        <td><?= htmlspecialchars($t['label']) ?></td>
+        <td><code>...<?= htmlspecialchars(substr($t['token'], -8)) ?></code></td>
+        <td><?= date('d/m/Y', strtotime($t['created_at'])) ?></td>
+        <td>
+          <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/<?= $t['id'] ?>/eliminar" style="display:inline">
+            <?= \Csrf::field() ?>
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar token?')">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if(empty($apiTokens)): ?><tr><td colspan="4" class="empty-row">Sin tokens generados</td></tr><?php endif; ?>
+      </tbody>
+    </table>
+    <!-- No enviamos este campo dentro del form principal; tiene su propio form -->
+    </div>
+</details>
+
+<!-- Nuevo token (form separado) -->
+<details class="settings-section">
+  <summary>➕ Generar nuevo token API</summary>
+  <div class="settings-body">
+    <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/crear" style="display:flex;gap:.75rem;align-items:flex-end">
+      <?= \Csrf::field() ?>
+      <div class="form-group" style="margin:0;flex:1"><label>Etiqueta</label><input type="text" name="label" required placeholder="Mi aplicación"></div>
+      <button type="submit" class="btn btn-primary">Generar token</button>
+    </form>
+  </div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TÍTULO ALUMNOS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section">
+  <summary>🎓 Título de alumnos</summary>
+  <div class="settings-body">
+    <div class="form-group">
+      <label>Imagen de fondo del título (PNG apaisado)</label>
+      <input type="file" name="cert_bg" accept="image/png,image/jpeg">
+      <?php if(!empty($s['cert_bg_path'])): ?>
+        <img src="<?= BASE_URL . htmlspecialchars($s['cert_bg_path']) ?>" style="max-width:320px;margin-top:.5rem;border-radius:6px;border:1px solid var(--color-border)" alt="Fondo título">
+      <?php endif; ?>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Posición X (px)</label><input type="number" name="cert_name_x" value="<?= htmlspecialchars($s['cert_name_x'] ?? '400') ?>"></div>
+      <div class="form-group"><label>Posición Y (px)</label><input type="number" name="cert_name_y" value="<?= htmlspecialchars($s['cert_name_y'] ?? '300') ?>"></div>
+      <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="cert_name_fontsize" value="<?= htmlspecialchars($s['cert_name_fontsize'] ?? '36') ?>"></div>
+      <div class="form-group"><label>Color texto (hex)</label><input type="color" name="cert_name_color" value="<?= htmlspecialchars($s['cert_name_color'] ?? '#000000') ?>"></div>
+    </div>
+
+    <!-- PREVIEW DEL TÍTULO -->
+    <div style="margin-top:1rem">
+      <button type="button" class="btn btn-secondary" onclick="previewCertificate()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Vista previa del título
+      </button>
+    </div>
+
+    <!-- Canvas preview -->
+    <div id="cert-preview-wrap" style="display:none;margin-top:1rem;position:relative">
+      <canvas id="cert-canvas" style="max-width:100%;border-radius:8px;border:1px solid var(--color-border);box-shadow:var(--shadow-md)"></canvas>
+      <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.5rem">Vista previa con nombre de ejemplo · Ajusta las coordenadas y pulsa de nuevo.</p>
+    </div>
+
+    <script>
+    function previewCertificate() {
+      var bgPath   = <?= json_encode(!empty($s['cert_bg_path']) ? BASE_URL . $s['cert_bg_path'] : '') ?>;
+      var posX     = parseInt(document.querySelector('[name=cert_name_x]').value) || 400;
+      var posY     = parseInt(document.querySelector('[name=cert_name_y]').value) || 300;
+      var fontSize = parseInt(document.querySelector('[name=cert_name_fontsize]').value) || 36;
+      var color    = document.querySelector('[name=cert_name_color]').value || '#000000';
+      var wrap     = document.getElementById('cert-preview-wrap');
+      var canvas   = document.getElementById('cert-canvas');
+      var ctx      = canvas.getContext('2d');
+
+      function drawName() {
+        ctx.font = 'bold ' + fontSize + 'px Inter, sans-serif';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.fillText('Alumno/a de Ejemplo', posX, posY);
+      }
+
+      wrap.style.display = 'block';
+
+      if (bgPath) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+          canvas.width  = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          ctx.drawImage(img, 0, 0);
+          drawName();
+        };
+        img.onerror = function() {
+          canvas.width = 1200; canvas.height = 600;
+          ctx.fillStyle = '#f3f3f3'; ctx.fillRect(0,0,1200,600);
+          ctx.fillStyle = '#aaa'; ctx.font = '24px Inter,sans-serif'; ctx.textAlign='center';
+          ctx.fillText('(sin imagen de fondo)', 600, 300);
+          drawName();
+        };
+        img.src = bgPath;
+      } else {
+        canvas.width = 1200; canvas.height = 600;
+        ctx.fillStyle = '#f3f3f3'; ctx.fillRect(0,0,1200,600);
+        ctx.fillStyle = '#aaa'; ctx.font = '24px Inter,sans-serif'; ctx.textAlign='center';
+        ctx.fillText('(sin imagen de fondo — sube un PNG en el campo de arriba)', 600, 300);
+        drawName();
+      }
+    }
+    </script>
+  </div>
+</details>
+
+<div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--color-border)">
+  <button type="submit" class="btn btn-primary">💾 Guardar todos los ajustes</button>
+</div>
+
 </form>
 
-<section class="settings-section">
-  <h2>Tokens API</h2>
-  <form action="<?= BASE_URL ?>/admin/api-tokens/crear" method="POST" class="form-inline">
-    <?= Csrf::field() ?>
-    <input type="text" name="label" placeholder="Etiqueta del token" required class="form-control">
-    <button type="submit" class="btn btn-primary">Crear token</button>
-  </form>
-  <table class="data-table" style="margin-top:var(--space-4)">
-    <thead><tr><th>Etiqueta</th><th>Token (últimos 8)</th><th>Último uso</th><th>Creado</th><th>Acciones</th></tr></thead>
-    <tbody>
-    <?php foreach ($apiTokens as $t): ?>
-    <tr>
-      <td><?= htmlspecialchars($t['label']) ?></td>
-      <td><code>...<?= substr($t['token'], -8) ?></code></td>
-      <td class="text-muted text-sm"><?= $t['last_used_at'] ? date('d/m/Y H:i', strtotime($t['last_used_at'])) : '—' ?></td>
-      <td class="text-sm"><?= date('d/m/Y', strtotime($t['created_at'])) ?></td>
-      <td>
-        <form action="<?= BASE_URL ?>/admin/api-tokens/<?= $t['id'] ?>/eliminar" method="POST" style="display:inline" onsubmit="return confirm('¿Eliminar token?')">
-          <?= Csrf::field() ?><button class="btn btn-sm btn-danger">Eliminar</button>
-        </form>
-      </td>
-    </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
