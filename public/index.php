@@ -41,7 +41,6 @@ $router->get('/login',     [AuthController::class, 'showLogin']);
 $router->post('/login',    [AuthController::class, 'login']);
 $router->get('/registro',  [AuthController::class, 'showRegister']);
 $router->post('/registro', [AuthController::class, 'register']);
-// Logout: acepta tanto GET (enlace directo) como POST (formulario sidebar)
 $router->get('/logout',    [AuthController::class, 'logout']);
 $router->post('/logout',   [AuthController::class, 'logout']);
 
@@ -61,24 +60,28 @@ $router->get('/descargar-titulo',   [EnrollmentController::class, 'downloadCerti
 $router->post('/examen/enviar',     [EnrollmentController::class, 'submitExam']);
 
 // --- ADMIN ---
-$router->get('/admin',                          [AdminController::class, 'dashboard']);
-$router->get('/admin/cursos',                   [AdminController::class, 'courses']);
-$router->post('/admin/cursos/guardar',          [AdminController::class, 'saveCourse']);
-$router->get('/admin/entregas',                 [AdminController::class, 'deliveries']);
-$router->post('/admin/entregas/guardar',        [AdminController::class, 'saveDelivery']);
-$router->post('/admin/entregas/{id}/eliminar',  [AdminController::class, 'deleteDelivery']);
-$router->get('/admin/examenes',                 [AdminController::class, 'exams']);
-$router->get('/admin/examenes/nuevo',           [AdminController::class, 'examEditor']);
-$router->get('/admin/examenes/{id}/editar',     [AdminController::class, 'examEditor']);
-$router->post('/admin/examenes/guardar',        [AdminController::class, 'saveExam']);
-$router->post('/admin/examenes/{id}/eliminar',  [AdminController::class, 'deleteExam']);
-$router->get('/admin/usuarios',                 [AdminController::class, 'users']);
-$router->get('/admin/usuarios/{id}',            [AdminController::class, 'userDetail']);
-$router->post('/admin/usuarios/guardar',        [AdminController::class, 'saveUser']);
-$router->get('/admin/actividad',                [AdminController::class, 'activity']);
-$router->get('/admin/settings',                 [AdminController::class, 'settings']);
-$router->post('/admin/settings/guardar',        [AdminController::class, 'saveSettings']);
-$router->post('/admin/api-tokens/crear',        [AdminController::class, 'createApiToken']);
-$router->post('/admin/api-tokens/{id}/eliminar',[AdminController::class, 'deleteApiToken']);
+$router->get('/admin',                                      [AdminController::class, 'dashboard']);
+$router->get('/admin/cursos',                               [AdminController::class, 'courses']);
+$router->post('/admin/cursos/guardar',                      [AdminController::class, 'saveCourse']);
+$router->get('/admin/entregas',                             [AdminController::class, 'deliveries']);
+$router->post('/admin/entregas/guardar',                    [AdminController::class, 'saveDelivery']);
+$router->post('/admin/entregas/{id}/eliminar',              [AdminController::class, 'deleteDelivery']);
+$router->get('/admin/examenes',                             [AdminController::class, 'exams']);
+$router->get('/admin/examenes/nuevo',                       [AdminController::class, 'examEditor']);
+$router->get('/admin/examenes/{id}/editar',                 [AdminController::class, 'examEditor']);
+$router->post('/admin/examenes/guardar',                    [AdminController::class, 'saveExam']);
+$router->post('/admin/examenes/{id}/eliminar',              [AdminController::class, 'deleteExam']);
+$router->get('/admin/usuarios',                             [AdminController::class, 'users']);
+$router->get('/admin/usuarios/{id}',                        [AdminController::class, 'userDetail']);
+$router->post('/admin/usuarios/guardar',                    [AdminController::class, 'saveUser']);
+$router->get('/admin/actividad',                            [AdminController::class, 'activity']);
+$router->get('/admin/settings',                             [AdminController::class, 'settings']);
+$router->post('/admin/settings/guardar',                    [AdminController::class, 'saveSettings']);
+// Tokens API — rutas consistentes con el template de settings
+$router->post('/admin/settings/token/crear',                [AdminController::class, 'createApiToken']);
+$router->post('/admin/settings/token/{id}/eliminar',        [AdminController::class, 'deleteApiToken']);
+// Alias por compatibilidad con rutas anteriores
+$router->post('/admin/api-tokens/crear',                    [AdminController::class, 'createApiToken']);
+$router->post('/admin/api-tokens/{id}/eliminar',            [AdminController::class, 'deleteApiToken']);
 
 $router->dispatch();

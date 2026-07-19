@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ────────────────────────────────────────────────────────────
+    // ── Courses ──────────────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,7 +53,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ─────────────────────────────────────────────────────────
+    // ── Deliveries ─────────────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -125,7 +125,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────────────────────
+    // ── Exams ──────────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -162,12 +162,10 @@ class AdminController
             $id = (int) Database::lastInsertId();
         }
 
-        // Link delivery
         if ($deliveryId) {
             Database::execute('UPDATE rsgrup_deliveries SET exam_id=? WHERE id=?', [$id, $deliveryId]);
         }
 
-        // Save questions
         if (isset($_POST['questions']) && is_array($_POST['questions'])) {
             ExamModel::saveQuestions($id, $_POST['questions']);
         }
@@ -186,7 +184,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ──────────────────────────────────────────────────────────────
+    // ── Users ──────────────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -201,7 +199,6 @@ class AdminController
         }
         if ($role) { $where .= ' AND u.role=?'; $bind[] = $role; }
 
-        // LEFT JOIN para detectar si tiene matrícula activa
         $sql = "SELECT u.*,
                     CASE WHEN m.id IS NOT NULL THEN 1 ELSE 0 END AS has_matricula
                 FROM rsgrup_users u
@@ -261,7 +258,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ───────────────────────────────────────────────────────────
+    // ── Activity ─────────────────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -271,7 +268,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ───────────────────────────────────────────────────────────
+    // ── Settings ─────────────────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -299,7 +296,13 @@ class AdminController
             }
         }
 
+        // Sync brand_accent_color from hex input if present
+        if (!empty($_POST['brand_accent_color_hex'])) {
+            $_POST['brand_accent_color'] = $_POST['brand_accent_color_hex'];
+        }
+
         $allowed = [
+            'brand_accent_color',
             'paypal_client_id','paypal_secret','paypal_mode',
             'smtp_host','smtp_port','smtp_user','smtp_password','smtp_from_name','smtp_from_email',
             'evolution_api_url','evolution_api_token','evolution_instance',
@@ -311,7 +314,9 @@ class AdminController
 
         foreach ($allowed as $key) {
             if (isset($_POST[$key])) {
-                $value = ($key === 'email_template_body') ? Sanitize::html($_POST[$key]) : Sanitize::string($_POST[$key], 2000);
+                $value = ($key === 'email_template_body')
+                    ? Sanitize::html($_POST[$key])
+                    : Sanitize::string($_POST[$key], 2000);
                 Database::execute(
                     'INSERT INTO rsgrup_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
                     [$key, $value]
