@@ -1,6 +1,5 @@
 <?php
 // templates/partials/header.php
-// Construir $user desde las SESSION keys
 $currentUserId = $_SESSION['user_id'] ?? null;
 if ($currentUserId) {
     $user = [
@@ -14,9 +13,11 @@ if ($currentUserId) {
 } else {
     $user = null;
 }
-$isAdmin = ($user['role'] ?? '') === ROLE_ADMIN;
+$isAdmin   = ($user['role'] ?? '') === ROLE_ADMIN;
 $metaTitle = $metaTitle ?? APP_NAME;
 $robots    = $robots    ?? 'noindex,nofollow';
+// $extraCss puede definirse ANTES del include para inyectar hojas adicionales
+$extraCss  = $extraCss  ?? [];
 
 // Color de marca dinámico
 $accentColor = '#e87722';
@@ -39,6 +40,10 @@ try {
 })();
 </script>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
+<?php foreach ($extraCss as $cssUrl): ?>
+<link rel="stylesheet" href="<?= htmlspecialchars($cssUrl) ?>">
+<?php endforeach; ?>
 <style>
   :root {
     --color-brand: <?= htmlspecialchars($accentColor) ?>;

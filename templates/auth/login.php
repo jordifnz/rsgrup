@@ -1,10 +1,8 @@
 <?php
 $metaTitle = 'Acceder';
-$robots = 'noindex,nofollow';
+$robots    = 'noindex,nofollow';
 include BASE_PATH . '/templates/partials/header.php';
 ?>
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
-
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="auth-logo">
@@ -62,5 +60,4 @@ include BASE_PATH . '/templates/partials/header.php';
     </form>
   </div>
 </div>
-
 <?php include BASE_PATH . '/templates/partials/footer.php'; ?>

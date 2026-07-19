@@ -1,11 +1,9 @@
 <?php
 $metaTitle = 'Registro';
-$robots = 'noindex,nofollow';
+$robots    = 'noindex,nofollow';
 include BASE_PATH . '/templates/partials/header.php';
 ?>
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
-
-<div class="auth-wrap">
+<div class="auth-wrap" style="align-items:flex-start;padding-top:var(--space-8)">
   <div class="register-card" style="max-width:680px;width:100%">
     <div class="auth-logo">
       <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="RSGrup" loading="eager" style="max-width:180px;margin:0 auto">
@@ -52,7 +50,6 @@ include BASE_PATH . '/templates/partials/header.php';
         <input type="file" name="avatar" accept="image/*">
       </div>
 
-      <!-- Verificación anti-bot simple -->
       <?php
         $q1 = rand(2,9); $q2 = rand(1,8);
         $_SESSION['captcha_answer'] = $q1 + $q2;
@@ -67,5 +64,4 @@ include BASE_PATH . '/templates/partials/header.php';
     </form>
   </div>
 </div>
-
 <?php include BASE_PATH . '/templates/partials/footer.php'; ?>

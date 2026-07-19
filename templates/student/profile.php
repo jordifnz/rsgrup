@@ -1,9 +1,10 @@
 <?php
 $metaTitle = 'Mi perfil';
 include BASE_PATH . '/templates/partials/header.php';
-?>
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
 
+$profile  = Database::fetchRow("SELECT * FROM rsgrup_users WHERE id=?", [$_SESSION['user_id']]);
+$initials = strtoupper(mb_substr($profile['name']??'',0,1).mb_substr($profile['surnames']??'',0,1));
+?>
 <div class="profile-wrap">
   <h1>Mi perfil</h1>
 
@@ -16,19 +17,13 @@ include BASE_PATH . '/templates/partials/header.php';
     <?php unset($_SESSION['flash_error']); ?>
   <?php endif; ?>
 
-  <?php
-    $profile = Database::fetchRow("SELECT * FROM rsgrup_users WHERE id=?", [$_SESSION['user_id']]);
-    $initials = strtoupper(mb_substr($profile['name']??'',0,1).mb_substr($profile['surnames']??'',0,1));
-  ?>
-
   <form method="POST" action="<?= BASE_URL ?>/perfil/guardar" enctype="multipart/form-data" class="auth-form">
     <?= \Csrf::field() ?>
 
-    <!-- Avatar -->
     <div class="avatar-upload-wrap">
       <div class="avatar-lg" id="avatar-preview">
         <?php if(!empty($profile['avatar'])): ?>
-          <img src="<?= BASE_URL . htmlspecialchars($profile['avatar']) ?>" alt="Avatar">
+          <img src="<?= BASE_URL . htmlspecialchars($profile['avatar']) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover">
         <?php else: ?>
           <?= htmlspecialchars($initials) ?>
         <?php endif; ?>
@@ -54,14 +49,14 @@ include BASE_PATH . '/templates/partials/header.php';
     </div>
 
     <hr style="border:none;border-top:1px solid var(--color-divider);margin:var(--space-6) 0">
-    <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-4)">Deja en blanco si no quieres cambiar la contrase&ntilde;a.</p>
+    <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-4)">Deja en blanco para no cambiar la contrase&ntilde;a.</p>
     <div class="profile-grid">
       <div class="form-group">
         <label>Nueva contrase&ntilde;a</label>
         <div class="password-field">
           <input type="password" name="new_password" id="new-pass">
           <button type="button" class="toggle-password" aria-label="Mostrar"
-                  onclick="(function(b){var i=document.getElementById('new-pass');if(i.type==='password'){i.type='text';}else{i.type='password';}})(this)">
+                  onclick="(function(b){var i=document.getElementById('new-pass');i.type=i.type==='password'?'text':'password';})(this)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
@@ -72,5 +67,4 @@ include BASE_PATH . '/templates/partials/header.php';
     <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-6)">Guardar cambios</button>
   </form>
 </div>
-
 <?php include BASE_PATH . '/templates/partials/footer.php'; ?>

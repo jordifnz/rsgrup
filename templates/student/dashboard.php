@@ -1,11 +1,7 @@
 <?php
-// templates/student/dashboard.php
 $metaTitle = 'Mi panel';
 include BASE_PATH . '/templates/partials/header.php';
-?>
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/public.css">
-<?php
-// Calcular si el alumno ha completado todas las entregas con examen realizado
+
 $allDeliveries = Database::fetchAll(
     "SELECT d.id FROM rsgrup_deliveries d WHERE d.active=1 AND d.type IN('entrega','practica') ORDER BY d.sort_order"
 );
@@ -27,14 +23,13 @@ if (!empty($allDeliveryIds)) {
     $titleReady = ((int)$completedCount === count($allDeliveryIds));
 }
 
-$courses   = Database::fetchAll("SELECT * FROM rsgrup_courses WHERE active=1 ORDER BY id");
+$courses     = Database::fetchAll("SELECT * FROM rsgrup_courses WHERE active=1 ORDER BY id");
 $userEnrolls = Database::fetchAll(
     "SELECT delivery_id FROM rsgrup_enrollments WHERE user_id=? AND status='active'",
     [$_SESSION['user_id']]
 );
 $enrolledIds = array_column($userEnrolls, 'delivery_id');
 ?>
-
 <div class="dashboard-wrap">
   <h1>Mi panel</h1>
 
@@ -77,7 +72,7 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
                 <span class="badge badge-<?= $d['type'] ?>"><?= ucfirst($d['type']) ?></span>
                 <span class="delivery-title"><?= htmlspecialchars($d['title']) ?></span>
                 <?php if($enrolled && $d['score'] !== null): ?>
-                  <span class="badge badge-score">Nota: <?= number_format((float)$d['score'], 1) ?></span>
+                  <span class="badge badge-score">Nota: <?= number_format((float)$d['score'],1) ?></span>
                 <?php elseif($enrolled && $d['exam_id']): ?>
                   <span class="badge badge-muted">Examen pendiente</span>
                 <?php endif; ?>
@@ -86,10 +81,10 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
                 <?php if($enrolled): ?>
                   <a href="<?= BASE_URL ?>/entrega/<?= $d['id'] ?>" class="btn btn-sm btn-primary">Acceder</a>
                 <?php else: ?>
-                  <?php if($d['type'] === 'practica'): ?>
-                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> &euro; (presencial)</span>
-                  <?php elseif($d['price'] > 0): ?>
-                    <span class="price-tag"><?= number_format((float)$d['price'], 2, ',', '.') ?> &euro;</span>
+                  <?php if($d['type']==='practica'): ?>
+                    <span class="price-tag"><?= number_format((float)$d['price'],2,',','.') ?> &euro; (presencial)</span>
+                  <?php elseif($d['price']>0): ?>
+                    <span class="price-tag"><?= number_format((float)$d['price'],2,',','.') ?> &euro;</span>
                   <?php endif; ?>
                   <a href="<?= BASE_URL ?>/inscribir/<?= $d['id'] ?>" class="btn btn-sm">Inscribirme</a>
                 <?php endif; ?>
@@ -101,20 +96,15 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
     <?php endforeach; ?>
   <?php endif; ?>
 
-  <!-- Descargar t&iacute;tulo -->
   <div class="title-cta">
     <?php if($titleReady): ?>
-      <a href="<?= BASE_URL ?>/descargar-titulo" class="btn btn-primary btn-lg">
-        &#127891; Descargar mi t&iacute;tulo
-      </a>
+      <a href="<?= BASE_URL ?>/descargar-titulo" class="btn btn-primary btn-lg">&#127891; Descargar mi t&iacute;tulo</a>
     <?php else: ?>
-      <button class="btn btn-primary btn-lg" disabled
-              title="Completa todas las entregas y sus ex&aacute;menes para descargar tu t&iacute;tulo">
+      <button class="btn btn-primary btn-lg" disabled title="Completa todas las entregas y sus ex&aacute;menes">
         &#127891; Descargar mi t&iacute;tulo
       </button>
       <p>Disponible cuando completes todas las entregas y ex&aacute;menes.</p>
     <?php endif; ?>
   </div>
 </div>
-
 <?php include BASE_PATH . '/templates/partials/footer.php'; ?>
