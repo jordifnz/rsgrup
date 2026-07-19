@@ -32,7 +32,7 @@ define('DB_HOST',    '82.223.107.197');
 define('DB_PORT',    '3306');
 define('DB_NAME',    'dbapprsgrup');
 define('DB_USER',    'adminrsgrup');
-define('DB_PASS',    'Abcde12345!)');
+define('DB_PASS',    'phJv%y3wPc_5Pxt4)');
 define('DB_CHARSET', 'utf8mb4');
 define('DB_PREFIX',  'rsgrup_');
 
