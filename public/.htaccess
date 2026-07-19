@@ -1,28 +1,29 @@
 Options -Indexes
 ServerSignature Off
 
-# Forzar HTTPS en producción (descomenta cuando tengas SSL)
+# Forzar HTTPS en producción (descomenta cuando tengas SSL activo)
 # RewriteCond %{HTTPS} off
 # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 RewriteEngine On
 
-# Bloquear acceso directo a directorios sensibles
+# --- SEGURIDAD: bloquear acceso a .git y archivos sensibles ---
+RewriteRule ^\.(git|env|htpasswd)(/|$) - [F,L]
+RewriteRule (^\.|\/\.)git - [F,L]
+
+# Bloquear acceso directo a directorios sensibles fuera de public/
 RewriteRule ^(config|src|templates|logs|sql)(/|$) - [F,L]
 
-# Bloquear archivos ocultos
-RewriteRule (^\.|\/\.) - [F,L]
-
-# Proteger uploads: bloquear ejecución PHP
+# Bloquear ejecución PHP en uploads
 RewriteCond %{REQUEST_URI} ^/uploads/
 RewriteRule \.php$ - [F,L]
 
-# Rutas API -> api/v1/index.php
+# --- API: redirigir /api/* a api/v1/index.php ---
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^api/(.*)$ ../api/v1/index.php [QSA,L]
 
-# Router principal: redirigir todo a index.php
+# --- Router principal: todo lo demás a index.php ---
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
@@ -39,12 +40,12 @@ RewriteRule ^ index.php [QSA,L]
 # Cache de assets estáticos
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css              "access plus 1 month"
+    ExpiresByType text/css               "access plus 1 month"
     ExpiresByType application/javascript "access plus 1 month"
-    ExpiresByType image/png             "access plus 1 year"
-    ExpiresByType image/jpeg            "access plus 1 year"
-    ExpiresByType image/svg+xml         "access plus 1 year"
-    ExpiresByType image/webp            "access plus 1 year"
+    ExpiresByType image/png              "access plus 1 year"
+    ExpiresByType image/jpeg             "access plus 1 year"
+    ExpiresByType image/svg+xml          "access plus 1 year"
+    ExpiresByType image/webp             "access plus 1 year"
 </IfModule>
 
 # Compresión

@@ -50,7 +50,7 @@ function requireLogin(string $redirectTo = '/login'): void
         if ($referer && $referer !== '/login') {
             $_SESSION['login_redirect'] = $referer;
         }
-        redirect(BASE_URL . $redirectTo);
+        redirect($redirectTo);
     }
 }
 
@@ -58,13 +58,13 @@ function requireAdmin(): void
 {
     requireLogin();
     if (!isAdmin()) {
-        redirect(BASE_URL . '/dashboard');
+        redirect('/dashboard');
     }
 }
 
 /**
  * Guarda datos del usuario en sesión.
- * Acepta el array tal como lo devuelve la BD (columnas: id, name, surnames, email, role, avatar).
+ * Acepta el array tal como lo devuelve la BD: id, name, surnames, email, role, avatar
  */
 function loginUser(array $user): void
 {
@@ -91,6 +91,11 @@ function logoutUser(): void
     session_destroy();
 }
 
+/**
+ * Guarda un mensaje flash.
+ * flash('error', ['type'=>'error','message'=>'...'])  -> guarda
+ * flash('error')                                       -> lee y borra
+ */
 function flash(string $key, mixed $value = null): mixed
 {
     if ($value !== null) {
@@ -102,11 +107,32 @@ function flash(string $key, mixed $value = null): mixed
     return $val;
 }
 
+/**
+ * Helper de conveniencia usado en templates.
+ * Devuelve el primer mensaje flash disponible (cualquier clave)
+ * como array ['type'=>..., 'message'=>...] o null si no hay ninguno.
+ */
+function getFlash(): ?array
+{
+    if (empty($_SESSION['_flash'])) return null;
+    // Tomamos el primer mensaje disponible
+    $key = array_key_first($_SESSION['_flash']);
+    $val = $_SESSION['_flash'][$key];
+    unset($_SESSION['_flash'][$key]);
+    // Normalizar: si es string, envolverlo
+    if (is_string($val)) {
+        return ['type' => $key, 'message' => $val];
+    }
+    return is_array($val) ? $val : null;
+}
+
+/**
+ * Redirige a una URL. Si no empieza por http, antepone BASE_URL.
+ */
 function redirect(string $url): never
 {
-    // Si la URL no empieza por http, anteponer BASE_URL
     if (!str_starts_with($url, 'http')) {
-        $url = BASE_URL . $url;
+        $url = (defined('BASE_URL') ? BASE_URL : '') . $url;
     }
     header('Location: ' . $url);
     exit;

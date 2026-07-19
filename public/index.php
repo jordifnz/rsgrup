@@ -1,8 +1,17 @@
 <?php
 declare(strict_types=1);
 
-// Bootstrap
-require_once dirname(__DIR__) . '/config/config.php';
+// Bootstrap: cargamos config primero — define BASE_PATH y todo lo demás
+$_configPath = dirname(__DIR__) . '/config/config.php';
+if (!is_file($_configPath)) {
+    http_response_code(500);
+    echo '<h1>Error de configuración</h1><p>No se encuentra config/config.php</p>';
+    exit;
+}
+require_once $_configPath;
+unset($_configPath);
+
+// A partir de aquí BASE_PATH está definido
 require_once BASE_PATH . '/config/database.php';
 require_once BASE_PATH . '/config/session.php';
 
@@ -34,26 +43,26 @@ startSession();
 $router = new Router();
 
 // --- AUTH ---
-$router->get('/login',    [AuthController::class, 'showLogin']);
-$router->post('/login',   [AuthController::class, 'login']);
-$router->get('/registro', [AuthController::class, 'showRegister']);
-$router->post('/registro',[AuthController::class, 'register']);
-$router->get('/logout',   [AuthController::class, 'logout']);
+$router->get('/login',     [AuthController::class, 'showLogin']);
+$router->post('/login',    [AuthController::class, 'login']);
+$router->get('/registro',  [AuthController::class, 'showRegister']);
+$router->post('/registro', [AuthController::class, 'register']);
+$router->get('/logout',    [AuthController::class, 'logout']);
 
 // --- STUDENT ---
-$router->get('/',                   [DashboardController::class, 'index']);
-$router->get('/dashboard',          [DashboardController::class, 'index']);
-$router->get('/perfil',             [DashboardController::class, 'profile']);
-$router->post('/perfil/guardar',    [DashboardController::class, 'updateProfile']);
+$router->get('/',                [DashboardController::class, 'index']);
+$router->get('/dashboard',       [DashboardController::class, 'index']);
+$router->get('/perfil',          [DashboardController::class, 'profile']);
+$router->post('/perfil/guardar', [DashboardController::class, 'updateProfile']);
 
-// Enrollments & Deliveries
-$router->get('/entrega/{slug}',         [EnrollmentController::class, 'showDelivery']);
-$router->post('/inscribir',             [EnrollmentController::class, 'initiate']);
-$router->get('/paypal/success',         [EnrollmentController::class, 'paypalSuccess']);
-$router->get('/paypal/cancel',          [EnrollmentController::class, 'paypalCancel']);
-$router->get('/descargar-pdf/{id}',     [EnrollmentController::class, 'downloadPdf']);
-$router->get('/descargar-titulo',       [EnrollmentController::class, 'downloadCertificate']);
-$router->post('/examen/enviar',         [EnrollmentController::class, 'submitExam']);
+// Entregas e inscripciones
+$router->get('/entrega/{slug}',     [EnrollmentController::class, 'showDelivery']);
+$router->post('/inscribir',         [EnrollmentController::class, 'initiate']);
+$router->get('/paypal/success',     [EnrollmentController::class, 'paypalSuccess']);
+$router->get('/paypal/cancel',      [EnrollmentController::class, 'paypalCancel']);
+$router->get('/descargar-pdf/{id}', [EnrollmentController::class, 'downloadPdf']);
+$router->get('/descargar-titulo',   [EnrollmentController::class, 'downloadCertificate']);
+$router->post('/examen/enviar',     [EnrollmentController::class, 'submitExam']);
 
 // --- ADMIN ---
 $router->get('/admin',                          [AdminController::class, 'dashboard']);
@@ -75,8 +84,5 @@ $router->get('/admin/settings',                 [AdminController::class, 'settin
 $router->post('/admin/settings/guardar',        [AdminController::class, 'saveSettings']);
 $router->post('/admin/api-tokens/crear',        [AdminController::class, 'createApiToken']);
 $router->post('/admin/api-tokens/{id}/eliminar',[AdminController::class, 'deleteApiToken']);
-
-// --- API ---
-// All API routes handled by api/v1/index.php via .htaccess rewrite
 
 $router->dispatch();
