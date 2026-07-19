@@ -33,6 +33,8 @@ try {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="<?= $robots ?>">
 <title><?= htmlspecialchars($metaTitle) ?> | <?= APP_NAME ?></title>
+<link rel="icon" type="image/x-icon" href="<?= BASE_URL ?>/assets/img/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="<?= BASE_URL ?>/assets/img/favicon.ico">
 <script>
 (function(){
   var t = localStorage.getItem('rsgrup-theme') || 'dark';
