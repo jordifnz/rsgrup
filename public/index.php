@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 
-// Bootstrap: cargamos config primero — define BASE_PATH y todo lo demás
 $_configPath = dirname(__DIR__) . '/config/config.php';
 if (!is_file($_configPath)) {
     http_response_code(500);
@@ -11,28 +10,23 @@ if (!is_file($_configPath)) {
 require_once $_configPath;
 unset($_configPath);
 
-// A partir de aquí BASE_PATH está definido
 require_once BASE_PATH . '/config/database.php';
 require_once BASE_PATH . '/config/session.php';
 
-// Helpers
 require_once BASE_PATH . '/src/Helpers/Router.php';
 require_once BASE_PATH . '/src/Helpers/Csrf.php';
 require_once BASE_PATH . '/src/Helpers/Sanitize.php';
 
-// Models
 require_once BASE_PATH . '/src/Models/UserModel.php';
 require_once BASE_PATH . '/src/Models/DeliveryModel.php';
 require_once BASE_PATH . '/src/Models/ExamModel.php';
 
-// Services
 require_once BASE_PATH . '/src/Services/ActivityLogger.php';
 require_once BASE_PATH . '/src/Services/MailService.php';
 require_once BASE_PATH . '/src/Services/WhatsAppService.php';
 require_once BASE_PATH . '/src/Services/PayPalService.php';
 require_once BASE_PATH . '/src/Services/CertificateService.php';
 
-// Controllers
 require_once BASE_PATH . '/src/Controllers/AuthController.php';
 require_once BASE_PATH . '/src/Controllers/DashboardController.php';
 require_once BASE_PATH . '/src/Controllers/EnrollmentController.php';
@@ -47,7 +41,9 @@ $router->get('/login',     [AuthController::class, 'showLogin']);
 $router->post('/login',    [AuthController::class, 'login']);
 $router->get('/registro',  [AuthController::class, 'showRegister']);
 $router->post('/registro', [AuthController::class, 'register']);
+// Logout: acepta tanto GET (enlace directo) como POST (formulario sidebar)
 $router->get('/logout',    [AuthController::class, 'logout']);
+$router->post('/logout',   [AuthController::class, 'logout']);
 
 // --- STUDENT ---
 $router->get('/',                [DashboardController::class, 'index']);
