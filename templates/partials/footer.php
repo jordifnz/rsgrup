@@ -14,7 +14,7 @@ try {
 </a>
 <?php endif; ?>
 <footer class="site-footer" role="contentinfo">
-  <div class="container">
+  <div class="container" style="text-align:center">
     <p>&copy; <?= date('Y') ?> <?= APP_NAME ?>. Todos los derechos reservados.</p>
   </div>
 </footer>

@@ -96,14 +96,14 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
     <?php endforeach; ?>
   <?php endif; ?>
 
-  <div class="title-cta">
+  <div class="title-cta" style="text-align:center">
     <?php if($titleReady): ?>
       <a href="<?= BASE_URL ?>/descargar-titulo" class="btn btn-primary btn-lg">&#127891; Descargar mi t&iacute;tulo</a>
     <?php else: ?>
       <button class="btn btn-primary btn-lg" disabled title="Completa todas las entregas y sus ex&aacute;menes">
         &#127891; Descargar mi t&iacute;tulo
       </button>
-      <p>Disponible cuando completes todas las entregas y ex&aacute;menes.</p>
+      <p style="margin-top:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">Disponible cuando completes todas las entregas y ex&aacute;menes.</p>
     <?php endif; ?>
   </div>
 </div>
