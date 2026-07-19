@@ -4,6 +4,7 @@ include BASE_PATH . '/templates/partials/header.php';
 
 $profile  = Database::fetchRow("SELECT * FROM rsgrup_users WHERE id=?", [$_SESSION['user_id']]);
 $initials = strtoupper(mb_substr($profile['name']??'',0,1).mb_substr($profile['surnames']??'',0,1));
+$hasAvatar = !empty($profile['avatar']);
 ?>
 <div class="profile-wrap">
   <h1>Mi perfil</h1>
@@ -19,20 +20,45 @@ $initials = strtoupper(mb_substr($profile['name']??'',0,1).mb_substr($profile['s
 
   <form method="POST" action="<?= BASE_URL ?>/perfil/guardar" enctype="multipart/form-data" class="auth-form">
     <?= \Csrf::field() ?>
+    <!-- Campo oculto: si se marca 1, el controller borra el avatar -->
+    <input type="hidden" name="delete_avatar" id="delete_avatar_flag" value="0">
 
     <div class="avatar-upload-wrap">
+      <!-- Preview del avatar -->
       <div class="avatar-lg" id="avatar-preview">
-        <?php if(!empty($profile['avatar'])): ?>
-          <img src="<?= BASE_URL . htmlspecialchars($profile['avatar']) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover">
+        <?php if($hasAvatar): ?>
+          <img src="<?= BASE_URL . htmlspecialchars($profile['avatar']) ?>" alt="Avatar"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%">
         <?php else: ?>
-          <?= htmlspecialchars($initials) ?>
+          <span id="avatar-initials"><?= htmlspecialchars($initials) ?></span>
         <?php endif; ?>
       </div>
-      <label class="btn btn-secondary btn-sm" style="cursor:pointer">
-        Cambiar foto
-        <input type="file" name="avatar" accept="image/*" style="display:none"
-               onchange="(function(f){if(f.files&&f.files[0]){var r=new FileReader();r.onload=function(e){var p=document.getElementById('avatar-preview');p.innerHTML='<img src=\''+e.target.result+'\' style=\'width:100%;height:100%;object-fit:cover\'>';};r.readAsDataURL(f.files[0]);}})(this)">
-      </label>
+
+      <!-- Acciones de avatar -->
+      <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Subir foto">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Cambiar foto
+          <input type="file" name="avatar" accept="image/*" style="display:none" id="avatar-file-input"
+                 onchange="rsAvatarPreview(this)">
+        </label>
+
+        <!-- Botón eliminar: solo visible si hay avatar O si se ha seleccionado uno nuevo -->
+        <button type="button" id="btn-delete-avatar"
+                class="btn btn-sm"
+                style="color:var(--color-error);border-color:var(--color-error);background:transparent;<?= $hasAvatar ? '' : 'display:none' ?>"
+                title="Eliminar foto y volver a iniciales"
+                onclick="rsDeleteAvatar('<?= htmlspecialchars($initials) ?>')"
+                aria-label="Eliminar foto de perfil">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          Eliminar foto
+        </button>
+      </div>
     </div>
 
     <div class="profile-grid">
@@ -67,4 +93,32 @@ $initials = strtoupper(mb_substr($profile['name']??'',0,1).mb_substr($profile['s
     <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-6)">Guardar cambios</button>
   </form>
 </div>
+
+<script>
+// Preview al seleccionar nueva foto
+function rsAvatarPreview(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var p = document.getElementById('avatar-preview');
+    p.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%" alt="Avatar">';
+    document.getElementById('delete_avatar_flag').value = '0';
+    document.getElementById('btn-delete-avatar').style.display = 'inline-flex';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// Eliminar foto: resetea preview a iniciales y marca el flag
+function rsDeleteAvatar(initials) {
+  var p   = document.getElementById('avatar-preview');
+  p.innerHTML = '<span id="avatar-initials" style="font-size:2rem;font-weight:700;color:var(--color-text-inverse)">' + initials + '</span>';
+  // Limpiar el file input para que no se suba nada
+  var fileInput = document.getElementById('avatar-file-input');
+  fileInput.value = '';
+  // Marcar para que el controller borre el avatar
+  document.getElementById('delete_avatar_flag').value = '1';
+  // Ocultar el botón de borrar (ya no hay foto)
+  document.getElementById('btn-delete-avatar').style.display = 'none';
+}
+</script>
 <?php include BASE_PATH . '/templates/partials/footer.php'; ?>

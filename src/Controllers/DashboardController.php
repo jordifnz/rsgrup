@@ -7,12 +7,9 @@ class DashboardController
     {
         requireLogin();
 
-        // Castear a int para evitar problemas con PDO ATTR_EMULATE_PREPARES=false
         $userId = (int)$_SESSION['user_id'];
+        $user   = UserModel::findById($userId);
 
-        $user = UserModel::findById($userId);
-
-        // Fallback: si la BD no devuelve datos, construir desde sesión
         if (empty($user)) {
             $user = [
                 'id'       => $userId,
@@ -24,10 +21,8 @@ class DashboardController
             ];
         }
 
-        // Entregas con estado de inscripción
         $rawDeliveries = DeliveryModel::getAllWithEnrollmentStatus($userId);
 
-        // Enriquecer cada entrega con can_enroll y enrollment normalizado
         foreach ($rawDeliveries as &$d) {
             $check           = DeliveryModel::canEnroll($userId, (int)$d['id']);
             $d['can_enroll'] = $check['ok'];
@@ -39,7 +34,6 @@ class DashboardController
         }
         unset($d);
 
-        // Agrupar por curso
         $coursesMap = [];
         foreach ($rawDeliveries as $d) {
             $cid = (int)($d['course_id'] ?? 0);
@@ -59,7 +53,6 @@ class DashboardController
         }
         $courses = array_values($coursesMap);
 
-        // ¿Puede descargar el título?
         $canDownloadCertificate = DeliveryModel::hasCompletedAll($userId);
 
         $metaTitle = 'Dashboard';
@@ -70,8 +63,7 @@ class DashboardController
     public function profile(array $params = []): void
     {
         requireLogin();
-        $user      = UserModel::findById((int)$_SESSION['user_id']);
-        // Fallback desde sesión
+        $user = UserModel::findById((int)$_SESSION['user_id']);
         if (empty($user)) {
             $user = [
                 'id'       => (int)$_SESSION['user_id'],
@@ -106,29 +98,49 @@ class DashboardController
             'tiktok'      => Sanitize::string($_POST['tiktok']      ?? '', 100),
         ];
 
-        // Avatar upload
-        if (!empty($_FILES['avatar']['tmp_name'])) {
+        // ── Eliminar avatar ─────────────────────────────────────────────
+        if (($_POST['delete_avatar'] ?? '0') === '1') {
+            // Borrar el archivo físico si existe
+            $current = UserModel::findById($userId);
+            if (!empty($current['avatar'])) {
+                $filePath = BASE_PATH . '/public' . $current['avatar'];
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+            $data['avatar'] = null;
+            $_SESSION['user_avatar'] = null;
+        }
+        // ── Subir nuevo avatar ─────────────────────────────────────────
+        elseif (!empty($_FILES['avatar']['tmp_name'])) {
             $ext     = strtolower(pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             if (in_array($ext, $allowed, true)) {
-                $dest = BASE_PATH . '/public/uploads/avatars/' . $userId . '.' . $ext;
+                // Borrar avatar anterior si existe
+                $current = UserModel::findById($userId);
+                if (!empty($current['avatar'])) {
+                    $old = BASE_PATH . '/public' . $current['avatar'];
+                    if (file_exists($old)) @unlink($old);
+                }
+                $filename = 'avatar_' . $userId . '_' . time() . '.' . $ext;
+                $dest     = BASE_PATH . '/public/uploads/avatars/' . $filename;
                 move_uploaded_file($_FILES['avatar']['tmp_name'], $dest);
-                $data['avatar'] = '/uploads/avatars/' . $userId . '.' . $ext;
+                $data['avatar']          = '/uploads/avatars/' . $filename;
+                $_SESSION['user_avatar'] = $data['avatar'];
             }
         }
 
-        // Cambio de contraseña
+        // ── Cambio de contraseña ──────────────────────────────────────
         $newPass = $_POST['new_password'] ?? '';
-        if ($newPass) {
+        if ($newPass !== '') {
             $dbUser = UserModel::findById($userId);
-            $storedHash = $dbUser['password'] ?? '';
-            if (!password_verify($_POST['current_password'] ?? '', $storedHash)) {
-                flash('error', ['type' => 'error', 'message' => 'La contraseña actual no es correcta.']);
-                redirect('/perfil');
+            if (!password_verify($_POST['current_password'] ?? '', $dbUser['password'] ?? '')) {
+                $_SESSION['flash_error'] = 'La contraseña actual no es correcta.';
+                header('Location: ' . BASE_URL . '/perfil'); exit;
             }
-            if (!Sanitize::validatePassword($newPass)) {
-                flash('error', ['type' => 'error', 'message' => 'La nueva contraseña debe tener mínimo 8 caracteres.']);
-                redirect('/perfil');
+            if (strlen($newPass) < 8) {
+                $_SESSION['flash_error'] = 'La nueva contraseña debe tener mínimo 8 caracteres.';
+                header('Location: ' . BASE_URL . '/perfil'); exit;
             }
             $data['password'] = $newPass;
         }
@@ -138,8 +150,11 @@ class DashboardController
 
         $_SESSION['user_name']     = $data['name'];
         $_SESSION['user_surnames'] = $data['surnames'];
+        if (isset($data['avatar'])) {
+            $_SESSION['user_avatar'] = $data['avatar'];
+        }
 
-        flash('success', ['type' => 'success', 'message' => 'Perfil actualizado correctamente.']);
-        redirect('/perfil');
+        $_SESSION['flash_success'] = 'Perfil actualizado correctamente.';
+        header('Location: ' . BASE_URL . '/perfil'); exit;
     }
 }
