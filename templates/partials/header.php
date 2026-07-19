@@ -1,5 +1,18 @@
 <?php
-$user    = $_SESSION['user'] ?? null;
+// Construir $user desde las SESSION keys sueltas que guarda loginUser()
+$currentUserId = $_SESSION['user_id'] ?? null;
+if ($currentUserId) {
+    $user = [
+        'id'       => $currentUserId,
+        'name'     => $_SESSION['user_name']     ?? '',
+        'surnames' => $_SESSION['user_surnames'] ?? '',
+        'email'    => $_SESSION['user_email']    ?? '',
+        'role'     => $_SESSION['user_role']     ?? ROLE_ALUMNO,
+        'avatar'   => $_SESSION['user_avatar']   ?? null,
+    ];
+} else {
+    $user = null;
+}
 $isAdmin = ($user['role'] ?? '') === ROLE_ADMIN;
 ?>
 <header class="site-header" role="banner">
@@ -19,14 +32,21 @@ $isAdmin = ($user['role'] ?? '') === ROLE_ADMIN;
       <button data-theme-toggle aria-label="Cambiar tema" class="btn-icon">
         <i data-lucide="sun"></i>
       </button>
-      <?php if ($user['avatar']): ?>
+      <?php
+        $initials = strtoupper(
+            mb_substr($user['name']     ?? '', 0, 1) .
+            mb_substr($user['surnames'] ?? '', 0, 1)
+        );
+      ?>
+      <?php if (!empty($user['avatar'])): ?>
         <img src="<?= BASE_URL . htmlspecialchars($user['avatar']) ?>" class="avatar-img avatar-sm" alt="Avatar">
       <?php else: ?>
-        <div class="avatar-initials avatar-sm"><?= htmlspecialchars(substr($user['name'],0,1).substr($user['surnames'],0,1)) ?></div>
+        <div class="avatar-initials avatar-sm"><?= htmlspecialchars($initials) ?></div>
       <?php endif; ?>
       <a href="<?= BASE_URL ?>/logout" class="btn btn-sm">Salir</a>
     </div>
-    <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')==='true'?'false':'true'); document.querySelector('.header-nav').classList.toggle('open')">
+    <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false"
+      onclick="this.setAttribute('aria-expanded',this.getAttribute('aria-expanded')==='true'?'false':'true');document.querySelector('.header-nav').classList.toggle('open')">
       <i data-lucide="menu"></i>
     </button>
     <?php endif; ?>

@@ -7,15 +7,29 @@ class DashboardController
     {
         requireLogin();
 
+        // Castear a int para evitar problemas con PDO ATTR_EMULATE_PREPARES=false
         $userId = (int)$_SESSION['user_id'];
-        $user   = UserModel::findById($userId);
 
-        // Todas las entregas con estado de inscripción para este usuario
+        $user = UserModel::findById($userId);
+
+        // Fallback: si la BD no devuelve datos, construir desde sesión
+        if (empty($user)) {
+            $user = [
+                'id'       => $userId,
+                'name'     => $_SESSION['user_name']     ?? '',
+                'surnames' => $_SESSION['user_surnames'] ?? '',
+                'email'    => $_SESSION['user_email']    ?? '',
+                'role'     => $_SESSION['user_role']     ?? ROLE_ALUMNO,
+                'avatar'   => $_SESSION['user_avatar']   ?? null,
+            ];
+        }
+
+        // Entregas con estado de inscripción
         $rawDeliveries = DeliveryModel::getAllWithEnrollmentStatus($userId);
 
         // Enriquecer cada entrega con can_enroll y enrollment normalizado
         foreach ($rawDeliveries as &$d) {
-            $check          = DeliveryModel::canEnroll($userId, (int)$d['id']);
+            $check           = DeliveryModel::canEnroll($userId, (int)$d['id']);
             $d['can_enroll'] = $check['ok'];
             $d['enrollment'] = [
                 'id'     => $d['enrollment_id']     ?? null,
@@ -25,7 +39,7 @@ class DashboardController
         }
         unset($d);
 
-        // Agrupar por curso para que la plantilla itere $courses
+        // Agrupar por curso
         $coursesMap = [];
         foreach ($rawDeliveries as $d) {
             $cid = (int)($d['course_id'] ?? 0);
@@ -57,6 +71,17 @@ class DashboardController
     {
         requireLogin();
         $user      = UserModel::findById((int)$_SESSION['user_id']);
+        // Fallback desde sesión
+        if (empty($user)) {
+            $user = [
+                'id'       => (int)$_SESSION['user_id'],
+                'name'     => $_SESSION['user_name']     ?? '',
+                'surnames' => $_SESSION['user_surnames'] ?? '',
+                'email'    => $_SESSION['user_email']    ?? '',
+                'role'     => $_SESSION['user_role']     ?? ROLE_ALUMNO,
+                'avatar'   => $_SESSION['user_avatar']   ?? null,
+            ];
+        }
         $metaTitle = 'Mi Perfil';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/student/profile.php';
@@ -92,11 +117,12 @@ class DashboardController
             }
         }
 
-        // Cambio de contraseña — columna `password`, no `password_hash`
+        // Cambio de contraseña
         $newPass = $_POST['new_password'] ?? '';
         if ($newPass) {
-            $user = UserModel::findById($userId);
-            if (!password_verify($_POST['current_password'] ?? '', $user['password'] ?? '')) {
+            $dbUser = UserModel::findById($userId);
+            $storedHash = $dbUser['password'] ?? '';
+            if (!password_verify($_POST['current_password'] ?? '', $storedHash)) {
                 flash('error', ['type' => 'error', 'message' => 'La contraseña actual no es correcta.']);
                 redirect('/perfil');
             }
@@ -104,13 +130,12 @@ class DashboardController
                 flash('error', ['type' => 'error', 'message' => 'La nueva contraseña debe tener mínimo 8 caracteres.']);
                 redirect('/perfil');
             }
-            $data['password'] = $newPass; // UserModel::update() hará el hash
+            $data['password'] = $newPass;
         }
 
         UserModel::update($userId, $data);
         ActivityLogger::log($userId, 'profile_updated', 'Perfil actualizado');
 
-        // Actualizar nombre en sesión
         $_SESSION['user_name']     = $data['name'];
         $_SESSION['user_surnames'] = $data['surnames'];
 
