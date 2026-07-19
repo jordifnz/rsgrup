@@ -194,9 +194,25 @@ class AdminController
         $role   = in_array($_GET['role'] ?? '', ['alumno','admin']) ? $_GET['role'] : '';
         $where  = 'WHERE 1=1';
         $bind   = [];
-        if ($search) { $where .= ' AND (name LIKE ? OR surnames LIKE ? OR email LIKE ?)'; $s="%{$search}%"; $bind = array_merge($bind, [$s,$s,$s]); }
-        if ($role)   { $where .= ' AND role=?'; $bind[] = $role; }
-        $users     = Database::fetchAll("SELECT * FROM rsgrup_users {$where} ORDER BY created_at DESC", $bind);
+        if ($search) {
+            $where .= ' AND (u.name LIKE ? OR u.surnames LIKE ? OR u.email LIKE ?)';
+            $s = "%{$search}%";
+            $bind = array_merge($bind, [$s, $s, $s]);
+        }
+        if ($role) { $where .= ' AND u.role=?'; $bind[] = $role; }
+
+        // LEFT JOIN para detectar si tiene matrícula activa
+        $sql = "SELECT u.*,
+                    CASE WHEN m.id IS NOT NULL THEN 1 ELSE 0 END AS has_matricula
+                FROM rsgrup_users u
+                LEFT JOIN rsgrup_enrollments m
+                    ON m.user_id = u.id
+                    AND m.status = 'active'
+                    AND m.delivery_id IN (SELECT id FROM rsgrup_deliveries WHERE type='matricula')
+                {$where}
+                ORDER BY u.created_at DESC";
+
+        $users     = Database::fetchAll($sql, $bind);
         $metaTitle = 'Usuarios';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/users.php';
@@ -259,7 +275,7 @@ class AdminController
     public function settings(array $params = []): void
     {
         $this->boot();
-        $settings  = Database::fetchAll('SELECT * FROM rsgrup_settings');
+        $settings  = Database::fetchAll('SELECT `key`, `value` FROM rsgrup_settings');
         $s         = [];
         foreach ($settings as $row) $s[$row['key']] = $row['value'];
         $apiTokens = Database::fetchAll('SELECT * FROM rsgrup_api_tokens ORDER BY created_at DESC');
@@ -297,7 +313,7 @@ class AdminController
             if (isset($_POST[$key])) {
                 $value = ($key === 'email_template_body') ? Sanitize::html($_POST[$key]) : Sanitize::string($_POST[$key], 2000);
                 Database::execute(
-                    'INSERT INTO rsgrup_settings (`key`,`value`,updated_at) VALUES (?,?,NOW()) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), updated_at=NOW()',
+                    'INSERT INTO rsgrup_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
                     [$key, $value]
                 );
             }
