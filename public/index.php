@@ -26,6 +26,7 @@ require_once BASE_PATH . '/src/Services/MailService.php';
 require_once BASE_PATH . '/src/Services/WhatsAppService.php';
 require_once BASE_PATH . '/src/Services/PayPalService.php';
 require_once BASE_PATH . '/src/Services/CertificateService.php';
+require_once BASE_PATH . '/src/Services/NotificationService.php';
 
 require_once BASE_PATH . '/src/Controllers/AuthController.php';
 require_once BASE_PATH . '/src/Controllers/DashboardController.php';
@@ -52,6 +53,7 @@ $router->post('/perfil/guardar', [DashboardController::class, 'updateProfile']);
 
 // Entregas e inscripciones
 $router->get('/entrega/{slug}',     [EnrollmentController::class, 'showDelivery']);
+$router->get('/inscribir/{id}',     [EnrollmentController::class, 'showEnroll']);
 $router->post('/inscribir',         [EnrollmentController::class, 'initiate']);
 $router->get('/paypal/success',     [EnrollmentController::class, 'paypalSuccess']);
 $router->get('/paypal/cancel',      [EnrollmentController::class, 'paypalCancel']);
@@ -77,10 +79,8 @@ $router->post('/admin/usuarios/guardar',                    [AdminController::cl
 $router->get('/admin/actividad',                            [AdminController::class, 'activity']);
 $router->get('/admin/settings',                             [AdminController::class, 'settings']);
 $router->post('/admin/settings/guardar',                    [AdminController::class, 'saveSettings']);
-// Tokens API — rutas consistentes con el template de settings
 $router->post('/admin/settings/token/crear',                [AdminController::class, 'createApiToken']);
 $router->post('/admin/settings/token/{id}/eliminar',        [AdminController::class, 'deleteApiToken']);
-// Alias por compatibilidad con rutas anteriores
 $router->post('/admin/api-tokens/crear',                    [AdminController::class, 'createApiToken']);
 $router->post('/admin/api-tokens/{id}/eliminar',            [AdminController::class, 'deleteApiToken']);
 
