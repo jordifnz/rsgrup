@@ -83,30 +83,32 @@ class AdminController
         $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        $pdfPath = $_POST['existing_pdf'] ?? null;
+        // pdf_file es el nombre de columna en rsgrup_deliveries
+        $pdfFile = $_POST['existing_pdf'] ?? null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
             if ($ext === 'pdf') {
                 $filename = uniqid('pdf_') . '.pdf';
                 $dest = BASE_PATH . '/private_files/' . $filename;
+                if (!is_dir(dirname($dest))) mkdir(dirname($dest), 0755, true);
                 move_uploaded_file($_FILES['pdf_file']['tmp_name'], $dest);
-                $pdfPath = $filename;
+                $pdfFile = $filename;
             }
         }
 
         $fields = [
             $courseId,$title,$description,$slug,$type,$price,$paymentType,$examId,
-            $sortOrder,$notifyEmail,$notifyWa,$pdfPath,$active
+            $sortOrder,$notifyEmail,$notifyWa,$pdfFile,$active
         ];
 
         if ($id) {
             Database::execute(
-                'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,exam_id=?,sort_order=?,notify_email=?,notify_whatsapp=?,pdf_path=?,active=?,updated_at=NOW() WHERE id=?',
+                'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,exam_id=?,sort_order=?,notify_email=?,notify_whatsapp=?,pdf_file=?,active=?,updated_at=NOW() WHERE id=?',
                 array_merge($fields, [$id])
             );
         } else {
             Database::execute(
-                'INSERT INTO rsgrup_deliveries (course_id,title,description,slug,type,price,payment_type,exam_id,sort_order,notify_email,notify_whatsapp,pdf_path,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
+                'INSERT INTO rsgrup_deliveries (course_id,title,description,slug,type,price,payment_type,exam_id,sort_order,notify_email,notify_whatsapp,pdf_file,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
                 $fields
             );
         }
@@ -287,7 +289,6 @@ class AdminController
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 $filename = 'background.' . $ext;
                 move_uploaded_file($_FILES['cert_bg']['tmp_name'], $uploadDir . $filename);
-                // Store path relative to public root (used by BASE_URL in frontend)
                 $_POST['cert_bg_path'] = '/uploads/certificates/' . $filename;
             }
         }
@@ -301,7 +302,6 @@ class AdminController
                 }
             }
         }
-        // Sync brand_accent_color from hex text input if provided
         if (!empty($_POST['brand_accent_color_hex'])) {
             $c = ltrim($_POST['brand_accent_color_hex'], '#');
             if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
