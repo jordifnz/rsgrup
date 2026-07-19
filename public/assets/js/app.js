@@ -2,19 +2,95 @@
 (function () {
   'use strict';
 
-  /* ---- Lucide icons ---- */
+  /* ================================================================
+     MODALS
+     Uso: openModal('modal-id') / closeModal('modal-id')
+     El elemento modal debe tener el atributo [hidden] y clase .modal
+  ================================================================ */
+  window.openModal = function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.removeAttribute('hidden');
+    el.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    // Focus en el primer campo interactivo del modal
+    setTimeout(function () {
+      var first = el.querySelector('input:not([type=hidden]), select, textarea, button:not(.modal-close)');
+      if (first) first.focus();
+    }, 50);
+  };
+
+  window.closeModal = function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute('hidden', '');
+    el.classList.remove('is-open');
+    document.body.style.overflow = '';
+  };
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal.is-open').forEach(function (m) {
+        closeModal(m.id);
+      });
+    }
+  });
+
+  /* ================================================================
+     TINYMCE — inicialización centralizada
+     Se aplica a todos los elementos con clase .wysiwyg-editor
+     Callback window.onTinyMceReady(editorId) notifica a los modales
+  ================================================================ */
+  function initTinyMCE() {
+    if (typeof tinymce === 'undefined') return;
+
+    // Destruir instancias antiguas antes de re-inicializar (evita duplicados)
+    if (tinymce.editors && tinymce.editors.length) {
+      tinymce.remove('.wysiwyg-editor');
+    }
+
+    tinymce.init({
+      selector: '.wysiwyg-editor',
+      language: 'es',
+      language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@23.10.9/langs6/es.js',
+      plugins: 'lists link image code table',
+      toolbar: 'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image | code',
+      menubar: false,
+      branding: false,
+      promotion: false,
+      height: 260,
+      skin: document.documentElement.getAttribute('data-theme') === 'dark' ? 'oxide-dark' : 'oxide',
+      content_css: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+      setup: function (editor) {
+        editor.on('init', function () {
+          // Notificar a los templates que TinyMCE está listo para este editor
+          if (typeof window.onTinyMceReady === 'function') {
+            window.onTinyMceReady(editor.id);
+          }
+        });
+      }
+    });
+  }
+
+  /* ================================================================
+     LUCIDE ICONS
+  ================================================================ */
   function initLucide() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
     }
   }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initLucide);
   } else {
     initLucide();
   }
 
-  /* ---- Theme toggle ---- */
+  /* ================================================================
+     THEME TOGGLE
+  ================================================================ */
   var root   = document.documentElement;
   var toggle = document.querySelector('[data-theme-toggle]');
 
@@ -22,7 +98,6 @@
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
 
-  // Inicializar tema (antes del render para evitar flash)
   var savedTheme = null;
   try { savedTheme = sessionStorage.getItem('rsgrup-theme'); } catch (e) {}
   var theme = savedTheme || (prefersDark() ? 'dark' : 'light');
@@ -49,8 +124,12 @@
       });
     }
 
-    /* ---- Re-init Lucide después del DOMContentLoaded (icono toggle recién insertado) ---- */
     initLucide();
+
+    /* ---- TinyMCE: inicializar si hay editores en la página ---- */
+    if (document.querySelector('.wysiwyg-editor')) {
+      initTinyMCE();
+    }
 
     /* ---- Cerrar nav mobile al hacer click fuera ---- */
     document.addEventListener('click', function (e) {
@@ -64,8 +143,7 @@
     });
 
     /* ---- Flash auto-dismiss (3 s) ---- */
-    var flashes = document.querySelectorAll('.flash');
-    flashes.forEach(function (el) {
+    document.querySelectorAll('.flash').forEach(function (el) {
       setTimeout(function () {
         el.style.transition = 'opacity 0.4s';
         el.style.opacity    = '0';
@@ -76,7 +154,7 @@
     /* ---- Confirm dialogs ---- */
     document.querySelectorAll('[data-confirm]').forEach(function (el) {
       el.addEventListener('click', function (e) {
-        if (!window.confirm(el.dataset.confirm || '¿Estas seguro?')) {
+        if (!window.confirm(el.dataset.confirm || '\u00bfEstas seguro?')) {
           e.preventDefault();
         }
       });

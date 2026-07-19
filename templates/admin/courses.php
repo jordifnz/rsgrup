@@ -34,17 +34,17 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     <h2 id="modal-course-title">Curso</h2>
     <form action="<?= BASE_URL ?>/admin/cursos/guardar" method="POST" class="form">
       <?= Csrf::field() ?>
-      <input type="hidden" name="id" id="course-id">
+      <input type="hidden" name="id" id="crs-id">
       <div class="form-group">
-        <label for="course-title-input">Título *</label>
-        <input type="text" name="title" id="course-title-input" required>
+        <label for="crs-title">Título *</label>
+        <input type="text" name="title" id="crs-title" required>
       </div>
       <div class="form-group">
-        <label for="course-desc">Descripción</label>
-        <textarea name="description" id="course-desc" rows="6"></textarea>
+        <label for="crs-desc">Descripción</label>
+        <textarea name="description" id="crs-desc" class="wysiwyg-editor" rows="6"></textarea>
       </div>
       <label class="checkbox-label">
-        <input type="checkbox" name="active" id="course-active" value="1" checked> Activo
+        <input type="checkbox" name="active" id="crs-active" value="1" checked> Activo
       </label>
       <div class="modal-actions">
         <button type="button" class="btn" onclick="closeModal('modal-course')">Cancelar</button>
@@ -55,41 +55,25 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <script>
-// Datos del curso pendientes de cargar en TinyMCE (si aún no estaba listo)
 var _pendingCourse = null;
 
-function openCourseModal(course) {
-  var isNew = !course || !course.id;
-
+function openCourseModal(c) {
+  var isNew = !c || !c.id;
   document.getElementById('modal-course-title').textContent = isNew ? 'Nuevo Curso' : 'Editar Curso';
-  document.getElementById('course-id').value            = isNew ? '' : course.id;
-  document.getElementById('course-title-input').value   = isNew ? '' : (course.title || '');
-  document.getElementById('course-active').checked      = isNew ? true : !!parseInt(course.active);
+  document.getElementById('crs-id').value    = isNew ? '' : (c.id    || '');
+  document.getElementById('crs-title').value = isNew ? '' : (c.title || '');
+  document.getElementById('crs-active').checked = isNew ? true : !!parseInt(c.active);
 
-  var descContent = isNew ? '' : (course.description || '');
-  var editor = window.tinymce ? tinymce.get('course-desc') : null;
-
+  var descContent = isNew ? '' : (c.description || '');
+  var editor = window.tinymce ? tinymce.get('crs-desc') : null;
   if (editor) {
-    // TinyMCE ya inicializado: cargar contenido directamente
     editor.setContent(descContent);
   } else {
-    // TinyMCE aún no listo: escribir en el textarea y guardar para el callback
-    document.getElementById('course-desc').value = descContent;
-    _pendingCourse = { content: descContent, editorId: 'course-desc' };
+    document.getElementById('crs-desc').value = descContent;
+    _pendingCourse = { content: descContent, editorId: 'crs-desc' };
   }
 
   openModal('modal-course');
-}
-
-// Callback que se llama cuando TinyMCE termina de inicializar un editor
-function onTinyMceReady(editorId) {
-  if (_pendingCourse && _pendingCourse.editorId === editorId) {
-    var ed = tinymce.get(editorId);
-    if (ed) {
-      ed.setContent(_pendingCourse.content);
-      _pendingCourse = null;
-    }
-  }
 }
 </script>
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
