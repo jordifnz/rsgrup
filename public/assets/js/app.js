@@ -28,6 +28,28 @@
   }
 })();
 
+// ── Toggle password visibility ──
+// Uso: onclick="togglePassword('input-id')"
+// El botón que lo llama debe tener un <i data-lucide="eye"> o data-lucide="eye-off" dentro.
+function togglePassword(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+
+  // Actualizar icono Lucide si está disponible
+  const btn  = input.closest('.input-with-toggle')?.querySelector('.btn-icon');
+  if (btn) {
+    const icon = btn.querySelector('i[data-lucide]');
+    if (icon) {
+      icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
+  // Devolver foco al input para buena UX
+  input.focus();
+}
+
 // ── Modal helpers ──
 function openModal(id) {
   const el = document.getElementById(id);
@@ -111,9 +133,7 @@ document.addEventListener('DOMContentLoaded', () => initTinyMCE());
       <button type="button" class="btn btn-sm" onclick="addAnswer(${qi})">+ Añadir respuesta</button>
     `;
     document.getElementById('questions-container').appendChild(div);
-    // Init wysiwyg for new textarea
     initTinyMCE(`[name="questions[${qi}][description]"]`);
-    // Add default answers if editing
     if (data?.answers?.length) {
       data.answers.forEach(a => addAnswer(qi, a));
     } else {
@@ -144,16 +164,14 @@ document.addEventListener('DOMContentLoaded', () => initTinyMCE());
     // Visual only — actual type stored in hidden field
   };
 
-  // Init button
   const addQBtn = document.getElementById('add-question-btn');
   if (addQBtn) addQBtn.addEventListener('click', () => addQuestion());
 
-  // Load existing questions from data attribute
   const existing = examForm.dataset.questions;
   if (existing) {
     try { JSON.parse(existing).forEach(addQuestion); } catch(e){}
   } else if (qIndex === 0) {
-    addQuestion(); // At least one question
+    addQuestion();
   }
 })();
 
@@ -180,6 +198,10 @@ if (avatarInput) {
 }
 
 // ── Flash auto-dismiss ──
-document.querySelectorAll('.alert').forEach(el => {
-  setTimeout(() => { el.style.transition = 'opacity 0.4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 4000);
+document.querySelectorAll('.alert, .flash').forEach(el => {
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.4s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 400);
+  }, 4000);
 });
