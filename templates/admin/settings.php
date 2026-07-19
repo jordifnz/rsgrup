@@ -9,17 +9,22 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <div class="alert alert-success"><?= htmlspecialchars($_SESSION['flash_success']) ?></div>
   <?php unset($_SESSION['flash_success']); ?>
 <?php endif; ?>
+<?php if(!empty($_SESSION['flash_error'])): ?>
+  <div class="alert alert-error"><?= htmlspecialchars($_SESSION['flash_error']) ?></div>
+  <?php unset($_SESSION['flash_error']); ?>
+<?php endif; ?>
 
-<form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data">
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- FORM PRINCIPAL (PayPal, SMTP, Evo API, WA, Plantillas, Cert) -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data" id="form-settings">
 <?= \Csrf::field() ?>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- ESTILOS -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section" open>
   <summary>🎨 Estilos de la aplicación</summary>
   <div class="settings-body">
-    <p class="settings-hint">Define los colores corporativos. Se aplican en botones, enlaces y elementos de acento en toda la aplicación.</p>
+    <p class="settings-hint">Define los colores corporativos. Se aplican en botones, enlaces y elementos de acento.</p>
     <div class="form-grid">
       <div class="form-group">
         <label>Color de botones y enlaces (hex)</label>
@@ -31,7 +36,10 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
                  value="<?= htmlspecialchars($s['brand_accent_color'] ?? '#e87722') ?>"
                  placeholder="#e87722" style="width:120px"
                  oninput="document.querySelector('[name=brand_accent_color]').value=this.value">
-          <span style="font-size:.8rem;color:var(--color-text-muted)">Vista previa: <a href="#" style="color:var(--color-brand)">enlace de ejemplo</a> · <button type="button" class="btn btn-primary btn-sm" style="padding:.2rem .6rem;font-size:.8rem">botón</button></span>
+          <span style="font-size:.8rem;color:var(--color-text-muted)">Vista previa:
+            <a href="#" style="color:var(--color-brand)">enlace de ejemplo</a> ·
+            <button type="button" class="btn btn-primary btn-sm" style="padding:.2rem .6rem;font-size:.8rem">botón</button>
+          </span>
         </div>
       </div>
     </div>
@@ -43,9 +51,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- PAYPAL -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>💳 PayPal</summary>
   <div class="settings-body">
@@ -56,16 +62,14 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
         <label>Modo</label>
         <select name="paypal_mode">
           <option value="sandbox" <?= ($s['paypal_mode']??'sandbox')==='sandbox'?'selected':'' ?>>Sandbox (pruebas)</option>
-          <option value="live" <?= ($s['paypal_mode']??'')==='live'?'selected':'' ?>>Live (producción)</option>
+          <option value="live"    <?= ($s['paypal_mode']??'')==='live'?'selected':'' ?>>Live (producción)</option>
         </select>
       </div>
     </div>
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- SMTP -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>📧 Email (SMTP)</summary>
   <div class="settings-body">
@@ -80,9 +84,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- EVOLUTION API -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>💬 Evolution API (WhatsApp)</summary>
   <div class="settings-body">
@@ -94,9 +96,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- WHATSAPP CONTACTO -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>📱 WhatsApp de contacto</summary>
   <div class="settings-body">
@@ -107,9 +107,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- PLANTILLAS -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>✉️ Plantillas de notificación</summary>
   <div class="settings-body">
@@ -130,50 +128,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- TOKENS API -->
-<!-- ══════════════════════════════════════════════════════════════ -->
-<details class="settings-section">
-  <summary>🔑 Tokens API</summary>
-  <div class="settings-body">
-    <table class="data-table" style="margin-bottom:1rem">
-      <thead><tr><th>Etiqueta</th><th>Últimos caracteres</th><th>Creado</th><th></th></tr></thead>
-      <tbody>
-      <?php foreach ($apiTokens as $t): ?>
-      <tr>
-        <td><?= htmlspecialchars($t['label']) ?></td>
-        <td><code>...<?= htmlspecialchars(substr($t['token'], -8)) ?></code></td>
-        <td><?= date('d/m/Y', strtotime($t['created_at'])) ?></td>
-        <td>
-          <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/<?= $t['id'] ?>/eliminar" style="display:inline">
-            <?= \Csrf::field() ?>
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar token?')">Eliminar</button>
-          </form>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php if(empty($apiTokens)): ?><tr><td colspan="4" class="empty-row">Sin tokens generados</td></tr><?php endif; ?>
-      </tbody>
-    </table>
-    <!-- No enviamos este campo dentro del form principal; tiene su propio form -->
-    </div>
-</details>
-
-<!-- Nuevo token (form separado) -->
-<details class="settings-section">
-  <summary>➕ Generar nuevo token API</summary>
-  <div class="settings-body">
-    <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/crear" style="display:flex;gap:.75rem;align-items:flex-end">
-      <?= \Csrf::field() ?>
-      <div class="form-group" style="margin:0;flex:1"><label>Etiqueta</label><input type="text" name="label" required placeholder="Mi aplicación"></div>
-      <button type="submit" class="btn btn-primary">Generar token</button>
-    </form>
-  </div>
-</details>
-
-<!-- ══════════════════════════════════════════════════════════════ -->
 <!-- TÍTULO ALUMNOS -->
-<!-- ══════════════════════════════════════════════════════════════ -->
 <details class="settings-section">
   <summary>🎓 Título de alumnos</summary>
   <div class="settings-body">
@@ -190,21 +145,16 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="cert_name_fontsize" value="<?= htmlspecialchars($s['cert_name_fontsize'] ?? '36') ?>"></div>
       <div class="form-group"><label>Color texto (hex)</label><input type="color" name="cert_name_color" value="<?= htmlspecialchars($s['cert_name_color'] ?? '#000000') ?>"></div>
     </div>
-
-    <!-- PREVIEW DEL TÍTULO -->
     <div style="margin-top:1rem">
       <button type="button" class="btn btn-secondary" onclick="previewCertificate()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         Vista previa del título
       </button>
     </div>
-
-    <!-- Canvas preview -->
     <div id="cert-preview-wrap" style="display:none;margin-top:1rem;position:relative">
       <canvas id="cert-canvas" style="max-width:100%;border-radius:8px;border:1px solid var(--color-border);box-shadow:var(--shadow-md)"></canvas>
       <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.5rem">Vista previa con nombre de ejemplo · Ajusta las coordenadas y pulsa de nuevo.</p>
     </div>
-
     <script>
     function previewCertificate() {
       var bgPath   = <?= json_encode(!empty($s['cert_bg_path']) ? BASE_URL . $s['cert_bg_path'] : '') ?>;
@@ -215,16 +165,13 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       var wrap     = document.getElementById('cert-preview-wrap');
       var canvas   = document.getElementById('cert-canvas');
       var ctx      = canvas.getContext('2d');
-
       function drawName() {
         ctx.font = 'bold ' + fontSize + 'px Inter, sans-serif';
         ctx.fillStyle = color;
         ctx.textAlign = 'left';
         ctx.fillText('Alumno/a de Ejemplo', posX, posY);
       }
-
       wrap.style.display = 'block';
-
       if (bgPath) {
         var img = new Image();
         img.crossOrigin = 'anonymous';
@@ -254,10 +201,45 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
+<!-- ══ BOTÓN SUBMIT — dentro del form ══ -->
 <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--color-border)">
   <button type="submit" class="btn btn-primary">💾 Guardar todos los ajustes</button>
 </div>
 
-</form>
+</form><!-- FIN form principal -->
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TOKENS API — form(s) independientes, FUERA del form principal -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<details class="settings-section" style="margin-top:1.5rem">
+  <summary>🔑 Tokens API</summary>
+  <div class="settings-body">
+    <table class="data-table" style="margin-bottom:1rem">
+      <thead><tr><th>Etiqueta</th><th>Últimos caracteres</th><th>Creado</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($apiTokens as $t): ?>
+      <tr>
+        <td><?= htmlspecialchars($t['label']) ?></td>
+        <td><code>...<?= htmlspecialchars(substr($t['token'], -8)) ?></code></td>
+        <td><?= date('d/m/Y', strtotime($t['created_at'])) ?></td>
+        <td>
+          <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/<?= (int)$t['id'] ?>/eliminar" style="display:inline">
+            <?= \Csrf::field() ?>
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar token?')">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if(empty($apiTokens)): ?><tr><td colspan="4" class="empty-row">Sin tokens generados</td></tr><?php endif; ?>
+      </tbody>
+    </table>
+
+    <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/crear" style="display:flex;gap:.75rem;align-items:flex-end">
+      <?= \Csrf::field() ?>
+      <div class="form-group" style="margin:0;flex:1"><label>Etiqueta del nuevo token</label><input type="text" name="label" required placeholder="Mi aplicación"></div>
+      <button type="submit" class="btn btn-primary">Generar token</button>
+    </form>
+  </div>
+</details>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
