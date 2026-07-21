@@ -11,46 +11,57 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </div>
 
-<!-- Tarjetas resumen -->
-<div class="form-grid" style="margin-bottom:var(--space-6)">
+<!-- Grid 2 columnas: datos personales + matrículas -->
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:var(--space-5);margin-bottom:var(--space-6);align-items:start">
 
+  <!-- Datos personales -->
   <div class="card">
     <div class="card-header"><strong>Datos personales</strong></div>
     <div class="card-body">
       <table class="detail-table">
         <tr><th>Email</th><td><?= htmlspecialchars($user['email']) ?></td></tr>
-        <tr><th>Tel&eacute;fono</th><td><?= htmlspecialchars($user['phone'] ?? '—') ?></td></tr>
-        <tr><th>Direcci&oacute;n</th><td><?= htmlspecialchars($user['address'] ?? '—') ?></td></tr>
-        <tr><th>C.P.</th><td><?= htmlspecialchars($user['postal_code'] ?? '—') ?></td></tr>
-        <tr><th>Poblaci&oacute;n</th><td><?= htmlspecialchars($user['city'] ?? '—') ?></td></tr>
-        <tr><th>Provincia</th><td><?= htmlspecialchars($user['province'] ?? '—') ?></td></tr>
-        <tr><th>Instagram</th><td><?= htmlspecialchars($user['instagram'] ?? '—') ?></td></tr>
-        <tr><th>TikTok</th><td><?= htmlspecialchars($user['tiktok'] ?? '—') ?></td></tr>
+        <tr><th>Tel&eacute;fono</th><td><?= htmlspecialchars($user['phone'] ?? '&mdash;') ?></td></tr>
+        <tr><th>Direcci&oacute;n</th><td><?= htmlspecialchars($user['address'] ?? '&mdash;') ?></td></tr>
+        <tr><th>C.P.</th><td><?= htmlspecialchars($user['postal_code'] ?? '&mdash;') ?></td></tr>
+        <tr><th>Poblaci&oacute;n</th><td><?= htmlspecialchars($user['city'] ?? '&mdash;') ?></td></tr>
+        <tr><th>Provincia</th><td><?= htmlspecialchars($user['province'] ?? '&mdash;') ?></td></tr>
+        <tr><th>Instagram</th><td><?= htmlspecialchars($user['instagram'] ?? '&mdash;') ?></td></tr>
+        <tr><th>TikTok</th><td><?= htmlspecialchars($user['tiktok'] ?? '&mdash;') ?></td></tr>
         <tr><th>Rol</th><td><span class="badge"><?= htmlspecialchars($user['role']) ?></span></td></tr>
         <tr><th>Registrado</th><td><?= date('d/m/Y H:i', strtotime($user['created_at'])) ?></td></tr>
       </table>
     </div>
   </div>
 
+  <!-- Matrículas y entregas -->
   <div class="card">
     <div class="card-header"><strong>Matr&iacute;culas y entregas</strong></div>
-    <div class="card-body">
+    <div class="card-body" style="padding:0">
       <?php if (empty($enrollments)): ?>
-        <p class="text-muted">Sin entregas registradas.</p>
+        <p style="padding:var(--space-5);color:var(--color-text-muted)">Sin entregas registradas.</p>
       <?php else: ?>
-      <table class="data-table">
-        <thead><tr><th>Tipo</th><th>Entrega</th><th>Estado</th><th>Fecha</th></tr></thead>
-        <tbody>
-        <?php foreach ($enrollments as $e): ?>
-        <tr>
-          <td><span class="badge badge-<?= $e['type'] ?>"><?= ucfirst($e['type']) ?></span></td>
-          <td><?= htmlspecialchars($e['title']) ?></td>
-          <td><span class="badge"><?= htmlspecialchars($e['status']) ?></span></td>
-          <td><?= date('d/m/Y', strtotime($e['created_at'])) ?></td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table class="data-table" style="min-width:480px">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Entrega</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach ($enrollments as $e): ?>
+          <tr>
+            <td><span class="badge badge-<?= htmlspecialchars($e['type']) ?>"><?= ucfirst(htmlspecialchars($e['type'])) ?></span></td>
+            <td><?= htmlspecialchars($e['title']) ?></td>
+            <td><span class="badge"><?= htmlspecialchars($e['status']) ?></span></td>
+            <td style="white-space:nowrap"><?= date('d/m/Y', strtotime($e['created_at'])) ?></td>
+          </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
       <?php endif; ?>
     </div>
   </div>
@@ -58,24 +69,28 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <!-- Actividad reciente -->
-<div class="card">
+<div class="card" style="margin-bottom:var(--space-6)">
   <div class="card-header"><strong>Actividad reciente</strong></div>
-  <div class="card-body">
+  <div class="card-body" style="padding:0">
     <?php if (empty($logs)): ?>
-      <p class="text-muted">Sin actividad registrada.</p>
+      <p style="padding:var(--space-5);color:var(--color-text-muted)">Sin actividad registrada.</p>
     <?php else: ?>
-    <table class="data-table">
-      <thead><tr><th>Fecha</th><th>Acci&oacute;n</th><th>Detalle</th></tr></thead>
-      <tbody>
-      <?php foreach ($logs as $l): ?>
-      <tr>
-        <td class="text-sm text-muted"><?= date('d/m/Y H:i', strtotime($l['created_at'])) ?></td>
-        <td><code><?= htmlspecialchars($l['action']) ?></code></td>
-        <td class="text-sm"><?= htmlspecialchars($l['detail'] ?? '') ?></td>
-      </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr><th>Fecha</th><th>Acci&oacute;n</th><th>Detalle</th></tr>
+        </thead>
+        <tbody>
+        <?php foreach ($logs as $l): ?>
+        <tr>
+          <td style="white-space:nowrap;color:var(--color-text-muted);font-size:var(--text-xs)"><?= date('d/m/Y H:i', strtotime($l['created_at'])) ?></td>
+          <td><code style="font-size:var(--text-xs)"><?= htmlspecialchars($l['action']) ?></code></td>
+          <td style="font-size:var(--text-sm)"><?= htmlspecialchars($l['detail'] ?? '') ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
     <?php endif; ?>
   </div>
 </div>
@@ -85,8 +100,8 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <div class="modal-backdrop" onclick="closeModal('modal-edit-user')"></div>
   <div class="modal-box modal-box--lg">
     <button class="modal-close" onclick="closeModal('modal-edit-user')" aria-label="Cerrar">&times;</button>
-    <h2>Editar usuario</h2>
-    <form method="POST" action="<?= BASE_URL ?>/admin/usuarios/guardar" class="form">
+    <h2 style="margin-bottom:var(--space-5)">Editar usuario</h2>
+    <form method="POST" action="<?= BASE_URL ?>/admin/usuarios/guardar">
       <?= \Csrf::field() ?>
       <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
       <div class="form-grid">
@@ -131,8 +146,8 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
           <input type="text" name="tiktok" value="<?= htmlspecialchars($user['tiktok'] ?? '') ?>">
         </div>
         <div class="form-group">
-          <label>Nueva contrase&ntilde;a <span class="text-muted">(dejar en blanco para no cambiar)</span></label>
-          <input type="password" name="password">
+          <label>Nueva contrase&ntilde;a <small>(dejar en blanco para no cambiar)</small></label>
+          <input type="password" name="password" autocomplete="new-password">
         </div>
         <div class="form-group">
           <label>Rol</label>
