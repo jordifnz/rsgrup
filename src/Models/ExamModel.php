@@ -47,7 +47,7 @@ class ExamModel
             $qid     = $q['id'];
             $answers = Database::fetchAll('SELECT * FROM rsgrup_exam_answers WHERE question_id=?', [$qid]);
 
-            $correctIds  = array_column(array_filter($answers, fn($a) => $a['is_correct']), 'id');
+            $correctIds   = array_column(array_filter($answers, fn($a) => $a['is_correct']), 'id');
             $submittedIds = isset($submitted[$qid]) ? (array)$submitted[$qid] : [];
             $submittedIds = array_map('intval', $submittedIds);
 
@@ -81,7 +81,7 @@ class ExamModel
 
     public static function saveQuestions(int $examId, array $questions): void
     {
-        // Delete existing questions and answers (cascade)
+        // Borrar preguntas y respuestas existentes
         $existing = Database::fetchAll('SELECT id FROM rsgrup_exam_questions WHERE exam_id=?', [$examId]);
         foreach ($existing as $q) {
             Database::execute('DELETE FROM rsgrup_exam_answers WHERE question_id=?', [$q['id']]);
@@ -90,22 +90,26 @@ class ExamModel
 
         foreach ($questions as $idx => $q) {
             $title = Sanitize::string($q['title'] ?? '');
-            $body  = Sanitize::html($q['body'] ?? '');
-            $type  = ($q['type'] ?? 'radio') === 'checkbox' ? 'checkbox' : 'radio';
-            $sort  = (int)$idx;
+            if (!$title) continue;
+
+            // El formulario envía answer_type (radio|checkbox)
+            $type = ($q['answer_type'] ?? $q['type'] ?? 'radio') === 'checkbox' ? 'checkbox' : 'radio';
+            $sort = (int)$idx;
 
             Database::execute(
-                'INSERT INTO rsgrup_exam_questions (exam_id,title,body,type,sort_order,created_at) VALUES (?,?,?,?,?,NOW())',
-                [$examId, $title, $body, $type, $sort]
+                'INSERT INTO rsgrup_exam_questions (exam_id, title, answer_type, sort_order, created_at)
+                 VALUES (?, ?, ?, ?, NOW())',
+                [$examId, $title, $type, $sort]
             );
             $qid = (int) Database::lastInsertId();
 
             if (!empty($q['answers']) && is_array($q['answers'])) {
                 foreach ($q['answers'] as $a) {
-                    $aText    = Sanitize::string($a['text'] ?? '');
+                    $aText     = Sanitize::string($a['text'] ?? '');
+                    if (!$aText) continue;
                     $isCorrect = !empty($a['is_correct']) ? 1 : 0;
                     Database::execute(
-                        'INSERT INTO rsgrup_exam_answers (question_id,text,is_correct) VALUES (?,?,?)',
+                        'INSERT INTO rsgrup_exam_answers (question_id, text, is_correct) VALUES (?, ?, ?)',
                         [$qid, $aText, $isCorrect]
                     );
                 }

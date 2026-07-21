@@ -8,6 +8,14 @@ $deliveries = $deliveries ?? [];
 ?>
 <?php include BASE_PATH . '/templates/admin/layout_admin.php'; ?>
 
+<style>
+/* Inputs de respuestas: texto siempre visible */
+.answer-row input[type="text"] {
+  color: var(--color-text, #f0f0f0);
+  background: var(--color-input-bg, var(--color-surface));
+}
+</style>
+
 <div class="section-header">
   <h1><?= ($exam ?? null) ? 'Editar examen' : 'Nuevo examen' ?></h1>
   <a href="<?= BASE_URL ?>/admin/examenes" class="btn">&larr; Volver</a>
@@ -56,7 +64,6 @@ $deliveries = $deliveries ?? [];
 
   <div id="questions-container">
     <?php foreach ($questions as $qi => $q): ?>
-    <!-- pregunta existente renderizada por PHP -->
     <div class="question-block" data-index="<?= $qi ?>" style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-5);margin-bottom:var(--space-5);background:var(--color-surface)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
         <strong style="font-size:var(--text-sm)">Pregunta #<span class="q-num"><?= $qi + 1 ?></span></strong>
@@ -71,8 +78,8 @@ $deliveries = $deliveries ?? [];
       <div class="form-group">
         <label>Tipo de respuesta</label>
         <select name="questions[<?= $qi ?>][answer_type]" class="answer-type-select">
-          <option value="radio"   <?= ($q['answer_type'] ?? 'radio') === 'radio'    ? 'selected' : '' ?>>Una respuesta (radio)</option>
-          <option value="checkbox" <?= ($q['answer_type'] ?? 'radio') === 'checkbox' ? 'selected' : '' ?>>M&uacute;ltiple (checkbox)</option>
+          <option value="radio"    <?= (($q['answer_type'] ?? 'radio') === 'radio')    ? 'selected' : '' ?>>Una respuesta (radio)</option>
+          <option value="checkbox" <?= (($q['answer_type'] ?? 'radio') === 'checkbox') ? 'selected' : '' ?>>M&uacute;ltiple (checkbox)</option>
         </select>
       </div>
       <div class="answers-wrapper" style="margin-top:var(--space-3)">
@@ -104,10 +111,8 @@ $deliveries = $deliveries ?? [];
 (function () {
   'use strict';
 
-  // Contador global de preguntas (continúa desde las ya renderizadas por PHP)
   var qCount = document.querySelectorAll('.question-block').length;
 
-  /* ── Plantilla HTML de una nueva pregunta ────────────────────────── */
   function questionHTML(qi) {
     return [
       '<div class="question-block" data-index="' + qi + '" style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-5);margin-bottom:var(--space-5);background:var(--color-surface)">',
@@ -132,12 +137,11 @@ $deliveries = $deliveries ?? [];
     ].join('');
   }
 
-  /* ── Plantilla HTML de una nueva respuesta ───────────────────────── */
   function answerHTML(qi, ai) {
     return [
       '<div class="answer-row" style="display:flex;gap:var(--space-3);align-items:center;margin-bottom:var(--space-2)">',
         '<input type="text" name="questions[' + qi + '][answers][' + ai + '][text]"',
-               ' placeholder="Texto de la respuesta" style="flex:1" required>',
+               ' placeholder="Texto de la respuesta" style="flex:1;color:var(--color-text,#f0f0f0)" required>',
         '<label style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:var(--text-sm)">',
           '<input type="checkbox"',
                  ' name="questions[' + qi + '][answers][' + ai + '][is_correct]"',
@@ -148,7 +152,6 @@ $deliveries = $deliveries ?? [];
     ].join('');
   }
 
-  /* ── Renumera visualmente las preguntas ──────────────────────────── */
   function renumberQuestions() {
     document.querySelectorAll('#questions-container .question-block').forEach(function (block, idx) {
       var numEl = block.querySelector('.q-num');
@@ -156,25 +159,20 @@ $deliveries = $deliveries ?? [];
     });
   }
 
-  /* ── Añadir pregunta ─────────────────────────────────────────────── */
   document.getElementById('add-question-btn').addEventListener('click', function () {
     var container = document.getElementById('questions-container');
     var div       = document.createElement('div');
     div.innerHTML = questionHTML(qCount);
     container.appendChild(div.firstElementChild);
-    // Añadir 2 respuestas vacías por defecto
-    var newBlock   = container.lastElementChild;
-    var wrapper    = newBlock.querySelector('.answers-wrapper');
+    var newBlock = container.lastElementChild;
+    var wrapper  = newBlock.querySelector('.answers-wrapper');
     addAnswerToWrapper(wrapper, qCount, 0);
     addAnswerToWrapper(wrapper, qCount, 1);
     qCount++;
     renumberQuestions();
   });
 
-  /* ── Delegación de eventos en el contenedor ──────────────────────── */
   document.getElementById('questions-container').addEventListener('click', function (e) {
-
-    // Eliminar pregunta
     if (e.target.classList.contains('remove-question-btn')) {
       var block = e.target.closest('.question-block');
       if (block) {
@@ -187,8 +185,6 @@ $deliveries = $deliveries ?? [];
       }
       return;
     }
-
-    // Añadir respuesta
     if (e.target.classList.contains('add-answer-btn')) {
       var block   = e.target.closest('.question-block');
       var qi      = parseInt(block.dataset.index, 10);
@@ -197,8 +193,6 @@ $deliveries = $deliveries ?? [];
       addAnswerToWrapper(wrapper, qi, ai);
       return;
     }
-
-    // Eliminar respuesta
     if (e.target.classList.contains('remove-answer-btn')) {
       var wrapper = e.target.closest('.answers-wrapper');
       if (wrapper && wrapper.querySelectorAll('.answer-row').length <= 1) {
@@ -211,14 +205,12 @@ $deliveries = $deliveries ?? [];
     }
   });
 
-  /* ── Helper: añadir fila de respuesta al wrapper ─────────────────── */
   function addAnswerToWrapper(wrapper, qi, ai) {
     var tmp = document.createElement('div');
     tmp.innerHTML = answerHTML(qi, ai);
     wrapper.appendChild(tmp.firstElementChild);
   }
 
-  /* ── TinyMCE en el textarea de descripción (ya visible, no modal) ── */
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof tinymce !== 'undefined') {
       var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -238,7 +230,6 @@ $deliveries = $deliveries ?? [];
     }
   });
 
-  /* ── Validación antes de enviar: mínimo 1 pregunta y 1 respuesta ─── */
   document.getElementById('exam-builder-form').addEventListener('submit', function (e) {
     var blocks = document.querySelectorAll('#questions-container .question-block');
     if (blocks.length === 0) {
@@ -248,15 +239,13 @@ $deliveries = $deliveries ?? [];
     }
     var ok = true;
     blocks.forEach(function (block) {
-      if (block.querySelectorAll('.answer-row').length === 0) {
-        ok = false;
-      }
+      if (block.querySelectorAll('.answer-row').length === 0) ok = false;
     });
     if (!ok) {
       e.preventDefault();
       alert('Cada pregunta debe tener al menos una respuesta.');
+      return;
     }
-    // Volcar TinyMCE al textarea antes de enviar
     if (window.tinymce) {
       var ed = tinymce.get('exam-description');
       if (ed) ed.save();
