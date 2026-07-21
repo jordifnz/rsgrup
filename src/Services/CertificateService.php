@@ -2,10 +2,11 @@
 declare(strict_types=1);
 
 /**
- * CertificateService — genera el título PNG/PDF del alumno.
+ * CertificateService — genera el título PDF del alumno.
  *
  * Fuente: DejaVu Sans Bold (disponible en el servidor vía php-gd).
  * Renderizado con imagettftext → anti-aliased, igual que la preview canvas.
+ * La salida siempre es un PDF (usando FPDF).
  */
 class CertificateService
 {
@@ -59,13 +60,8 @@ class CertificateService
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
-        if (class_exists('FPDF')) {
-            $this->outputPdf($img, $fullName);
-        } else {
-            header('Content-Type: image/png');
-            header('Content-Disposition: attachment; filename="titulo_' . $this->slug($fullName) . '.png"');
-            imagepng($img);
-        }
+        // Siempre generar PDF
+        $this->outputPdf($img, $fullName);
         imagedestroy($img);
     }
 
