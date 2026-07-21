@@ -24,51 +24,68 @@ class WhatsAppService
     }
 
     /**
-     * Normaliza el teléfono a formato internacional sin + ni espacios.
-     * Ejemplos: "612 345 678" → "34612345678"
-     *           "+34 612 345 678" → "34612345678"
-     *           "0034612345678"  → "34612345678"
-     *           "34612345678"    → "34612345678"  (ya correcto)
+     * Normaliza el teléfono al formato que Evolution API necesita:
+     * número E.164 sin "+", sin espacios ni guiones.
+     *
+     * Ejemplos:
+     *   "612 345 678"        → "34612345678"  (móvil ES sin prefijo)
+     *   "+34 612 345 678"    → "34612345678"
+     *   "0034612345678"      → "34612345678"
+     *   "34612345678"        → "34612345678"  (ya correcto)
+     *   "+52 55 1234 5678"   → "525512345678" (México, 12 dígitos)
      */
-    private function normalizePhone(string $phone): string
+    public function normalizePhone(string $phone): string
     {
-        // Quitar todo lo que no sea dígito
-        $digits = preg_replace('/[^0-9]/', '', $phone);
+        // 1. Quitar todo excepto dígitos
+        $d = preg_replace('/[^0-9]/', '', $phone);
 
-        // Quitar prefijo 0034
-        if (str_starts_with($digits, '0034')) {
-            $digits = substr($digits, 4);
-        }
-        // Quitar prefijo 34 si va seguido de 9 dígitos (número español sin el 34)
-        if (str_starts_with($digits, '34') && strlen($digits) === 11) {
-            $digits = substr($digits, 2);
-        }
-        // Si quedan 9 dígitos, añadir prefijo España
-        if (strlen($digits) === 9) {
-            $digits = '34' . $digits;
+        // 2. Eliminar prefijo de marcación internacional 00
+        if (str_starts_with($d, '00')) {
+            $d = substr($d, 2);
         }
 
-        return $digits;
+        // 3. Si son exactamente 9 dígitos y empieza por 6, 7 o 9 → móvil/fijo español sin prefijo
+        if (strlen($d) === 9 && preg_match('/^[679]/', $d)) {
+            $d = '34' . $d;
+        }
+
+        // 4. Si tras quitar el 00 quedan 9 dígitos genéricos, añadir 34
+        //    (cubre el caso de que el usuario haya guardado sólo el número local)
+        if (strlen($d) === 9) {
+            $d = '34' . $d;
+        }
+
+        return $d;
     }
 
     public function send(string $phone, string $message): bool
     {
-        if (!$this->apiUrl || !$this->apiToken || !$this->instance) {
-            error_log('[WhatsAppService] Evolution API no configurada (evolution_api_url, evolution_api_token, evolution_instance).');
+        // Validar configuración
+        if ($this->apiUrl === '' || $this->apiToken === '' || $this->instance === '') {
+            error_log('[WhatsAppService] Evolution API no configurada. '
+                . 'evolution_api_url=' . ($this->apiUrl ?: '(vacío)') . ' '
+                . 'evolution_api_token=' . ($this->apiToken ? '(ok)' : '(vacío)') . ' '
+                . 'evolution_instance=' . ($this->instance ?: '(vacío)'));
             return false;
         }
 
-        $phone = $this->normalizePhone($phone);
-        if (strlen($phone) < 10) {
-            error_log('[WhatsAppService] Teléfono inválido tras normalización: ' . $phone);
+        $normalized = $this->normalizePhone($phone);
+
+        if (strlen($normalized) < 10) {
+            error_log('[WhatsAppService] Teléfono inválido tras normalización. '
+                . 'original=' . $phone . ' normalizado=' . $normalized);
             return false;
         }
 
+        // Evolution API v2: POST /message/sendText/{instance}
+        // El destinatario va como "<número>@s.whatsapp.net"
         $url     = rtrim($this->apiUrl, '/') . '/message/sendText/' . urlencode($this->instance);
         $payload = json_encode([
-            'number' => $phone . '@s.whatsapp.net',
-            'text'   => $message,
-        ]);
+            'number'  => $normalized . '@s.whatsapp.net',
+            'text'    => $message,
+        ], JSON_UNESCAPED_UNICODE);
+
+        error_log('[WhatsAppService] Enviando a ' . $normalized . '@s.whatsapp.net via ' . $url);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -79,34 +96,26 @@ class WhatsAppService
                 'Content-Type: application/json',
                 'apikey: ' . $this->apiToken,
             ],
-            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_TIMEOUT        => 15,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr  = curl_error($ch);
         curl_close($ch);
 
-        if ($curlErr) {
+        if ($curlErr !== '') {
             error_log('[WhatsAppService] cURL error: ' . $curlErr);
             return false;
         }
+
         if ($httpCode < 200 || $httpCode >= 300) {
-            error_log('[WhatsAppService] HTTP ' . $httpCode . ': ' . $response);
+            error_log('[WhatsAppService] HTTP ' . $httpCode . ' response: ' . $response);
             return false;
         }
-        return true;
-    }
 
-    public static function renderTemplate(array $vars): string
-    {
-        $tpl  = Database::fetch('SELECT `value` FROM rsgrup_settings WHERE `key` = ?', ['whatsapp_template']);
-        $text = $tpl
-            ? $tpl['value']
-            : 'Hola {{nombre}}, tu inscripción a {{entrega}} ha sido confirmada el {{fecha}}. Accede en: {{sitio}}';
-        foreach ($vars as $k => $v) {
-            $text = str_replace('{{' . $k . '}}', (string)$v, $text);
-        }
-        return $text;
+        error_log('[WhatsAppService] Enviado OK. HTTP ' . $httpCode . ' response: ' . $response);
+        return true;
     }
 }
