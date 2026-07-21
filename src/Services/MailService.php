@@ -4,7 +4,7 @@ declare(strict_types=1);
 class MailService
 {
     private string $host;
-    private int $port;
+    private int    $port;
     private string $user;
     private string $pass;
     private string $fromEmail;
@@ -12,48 +12,48 @@ class MailService
 
     public function __construct()
     {
-        $this->host      = $this->getSetting('smtp_host', 'smtp.gmail.com');
-        $this->port      = (int)$this->getSetting('smtp_port', '587');
-        $this->user      = $this->getSetting('smtp_user', '');
-        $this->pass      = $this->getSetting('smtp_password', '');
-        $this->fromEmail = $this->getSetting('smtp_from_email', $this->user);
-        $this->fromName  = $this->getSetting('smtp_from_name', 'RSGrup');
+        $this->host      = $this->getSetting('smtp_host',       'smtp.gmail.com');
+        $this->port      = (int)$this->getSetting('smtp_port',  '587');
+        $this->user      = $this->getSetting('smtp_user',       '');
+        $this->pass      = $this->getSetting('smtp_password',   '');
+        $this->fromEmail = $this->getSetting('smtp_from_email', '') ?: $this->user;
+        $this->fromName  = $this->getSetting('smtp_from_name',  'RSGrup');
     }
 
+    /**
+     * Lee un valor de rsgrup_settings.
+     * La tabla usa columnas setting_key / setting_value.
+     */
     private function getSetting(string $key, string $default = ''): string
     {
-        $row = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`=?', [$key]);
-        return $row ? $row['value'] : $default;
+        $row = Database::fetch(
+            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?',
+            [$key]
+        );
+        return $row ? (string)$row['setting_value'] : $default;
     }
 
+    /**
+     * Envía un e-mail HTML.
+     *
+     * @param string $toEmail   Dirección destino
+     * @param string $toName    Nombre destino
+     * @param string $subject   Asunto
+     * @param string $htmlBody  Cuerpo HTML
+     */
     public function send(string $toEmail, string $toName, string $subject, string $htmlBody): bool
     {
-        $boundary = md5(uniqid());
-        $headers  = implode("\r\n", [
-            "MIME-Version: 1.0",
-            "Content-Type: multipart/alternative; boundary=\"{$boundary}\"",
-            "From: {$this->fromName} <{$this->fromEmail}>",
-            "To: {$toName} <{$toEmail}>",
-            "X-Mailer: RSGrup/1.0",
-        ]);
-
-        $textBody = strip_tags($htmlBody);
-        $message  = "--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n{$textBody}\r\n";
-        $message .= "--{$boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n{$htmlBody}\r\n";
-        $message .= "--{$boundary}--";
-
-        // Use PHPMailer if available, otherwise native mail()
         if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
             return $this->sendViaPHPMailer($toEmail, $toName, $subject, $htmlBody);
         }
 
-        // Native mail with SMTP not supported without extension; log and return false
-        error_log("[MailService] PHPMailer not found. Install via: composer require phpmailer/phpmailer");
+        error_log('[MailService] PHPMailer no encontrado. Instálalo: composer require phpmailer/phpmailer');
         return false;
     }
 
-    private function sendViaPHPMailer(string $toEmail, string $toName, string $subject, string $htmlBody): bool
-    {
+    private function sendViaPHPMailer(
+        string $toEmail, string $toName, string $subject, string $htmlBody
+    ): bool {
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
         try {
             $mail->isSMTP();
@@ -61,7 +61,9 @@ class MailService
             $mail->SMTPAuth   = true;
             $mail->Username   = $this->user;
             $mail->Password   = $this->pass;
-            $mail->SMTPSecure = ($this->port === 465) ? 'ssl' : 'tls';
+            $mail->SMTPSecure = ($this->port === 465)
+                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
+                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = $this->port;
             $mail->CharSet    = 'UTF-8';
             $mail->setFrom($this->fromEmail, $this->fromName);
@@ -79,26 +81,37 @@ class MailService
     }
 
     /**
-     * Parse and render a template from settings with variables.
+     * Renderiza una plantilla almacenada en settings sustituyendo variables {{key}}.
+     *
+     * @param  string   $subjectKey  setting_key del asunto
+     * @param  string   $bodyKey     setting_key del cuerpo HTML
+     * @param  array    $vars        [ 'nombre' => '...', 'entrega' => '...', ... ]
+     * @return array{subject:string, body:string}
      */
-    public static function renderTemplate(string $templateKey, array $vars): array
+    public static function renderTemplate(string $subjectKey, string $bodyKey, array $vars): array
     {
-        $subject  = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`="email_template_subject"');
-        $body     = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`="{$templateKey}"') 
-                    ?? Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`="email_template_body"');
+        $subjectRow = Database::fetch(
+            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?', [$subjectKey]
+        );
+        $bodyRow = Database::fetch(
+            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?', [$bodyKey]
+        );
 
-        $subjectText = $subject ? $subject['value'] : 'Inscripción confirmada - RSGrup';
-        $bodyText    = $body    ? $body['value']    : self::defaultEmailTemplate();
+        $subject = $subjectRow ? $subjectRow['setting_value'] : 'Inscripción confirmada - RSGrup';
+        $body    = $bodyRow    ? $bodyRow['setting_value']    : self::defaultEmailTemplate();
 
         foreach ($vars as $k => $v) {
-            $subjectText = str_replace('{{'.$k.'}}', (string)$v, $subjectText);
-            $bodyText    = str_replace('{{'.$k.'}}', (string)$v, $bodyText);
+            $subject = str_replace('{{' . $k . '}}', (string)$v, $subject);
+            $body    = str_replace('{{' . $k . '}}', (string)$v, $body);
         }
-        return ['subject' => $subjectText, 'body' => $bodyText];
+        return ['subject' => $subject, 'body' => $body];
     }
 
     private static function defaultEmailTemplate(): string
     {
-        return '<p>Hola {{nombre}},</p><p>Tu inscripción a <strong>{{entrega}}</strong> ha sido confirmada.</p><p>Puedes acceder a tu contenido en: <a href="{{url}}">{{url}}</a></p><p>Saludos,<br>El equipo de RSGrup</p>';
+        return '<p>Hola {{nombre}},</p>'
+             . '<p>Tu inscripción a <strong>{{entrega}}</strong> ha sido confirmada el {{fecha}}.</p>'
+             . '<p>Accede a tu cuenta en: <a href="{{sitio}}">{{sitio}}</a></p>'
+             . '<p>Saludos,<br>El equipo de RSGrup</p>';
     }
 }

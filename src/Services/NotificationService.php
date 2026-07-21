@@ -31,36 +31,36 @@ class NotificationService
     // -------------------------------------------------------------------------
     private static function buildVars(array $user, array $delivery): array
     {
+        // Campos reales de la tabla rsgrup_users: name, surnames
         return [
-            '{{nombre}}'        => $user['first_name'] ?? '',
-            '{{apellidos}}'     => $user['last_name']  ?? '',
-            '{{email}}'         => $user['email']      ?? '',
-            '{{telefono}}'      => $user['phone']      ?? '',
-            '{{entrega}}'       => $delivery['title']  ?? '',
-            '{{tipo}}'          => $delivery['type']   ?? '',
-            '{{precio}}'        => number_format((float)($delivery['price'] ?? 0), 2, ',', '.') . ' €',
-            '{{fecha}}'         => date('d/m/Y H:i'),
-            '{{sitio}}'         => defined('BASE_URL') ? BASE_URL : '',
+            '{{nombre}}'    => $user['name']      ?? '',
+            '{{apellidos}}' => $user['surnames']  ?? '',
+            '{{email}}'     => $user['email']     ?? '',
+            '{{telefono}}'  => $user['phone']     ?? '',
+            '{{entrega}}'   => $delivery['title'] ?? '',
+            '{{tipo}}'      => $delivery['type']  ?? '',
+            '{{precio}}'    => number_format((float)($delivery['price'] ?? 0), 2, ',', '.') . ' €',
+            '{{fecha}}'     => date('d/m/Y H:i'),
+            '{{sitio}}'     => defined('BASE_URL') ? BASE_URL : '',
         ];
     }
 
     private static function sendEmail(array $user, array $delivery, array $vars): void
     {
         try {
-            $db = Database::getInstance();
-
             // Plantilla de e-mail desde settings
-            $tplRow = $db->fetchOne(
+            $tplRow = Database::fetch(
                 "SELECT setting_value FROM rsgrup_settings WHERE setting_key = 'email_template_enrollment'"
             );
-            $subject = 'Inscripción confirmada: ' . $delivery['title'];
+            $subject = 'Inscripción confirmada: ' . ($delivery['title'] ?? '');
             $body    = $tplRow ? $tplRow['setting_value'] : self::defaultEmailTemplate();
             $body    = strtr($body, $vars);
 
-            $mail = new MailService();
-            $mail->send($user['email'], $subject, $body);
+            // MailService::send espera (toEmail, toName, subject, htmlBody)
+            $toName = trim(($user['name'] ?? '') . ' ' . ($user['surnames'] ?? ''));
+            $mail   = new MailService();
+            $mail->send($user['email'], $toName, $subject, $body);
         } catch (\Throwable $e) {
-            // Notificación no crítica: loguear pero no romper el flujo
             error_log('[NotificationService::sendEmail] ' . $e->getMessage());
         }
     }
@@ -68,9 +68,7 @@ class NotificationService
     private static function sendWhatsApp(array $user, array $delivery, array $vars): void
     {
         try {
-            $db = Database::getInstance();
-
-            $tplRow = $db->fetchOne(
+            $tplRow = Database::fetch(
                 "SELECT setting_value FROM rsgrup_settings WHERE setting_key = 'whatsapp_template_enrollment'"
             );
             $body = $tplRow ? $tplRow['setting_value'] : self::defaultWhatsAppTemplate();
@@ -78,8 +76,9 @@ class NotificationService
 
             $phone = $user['phone'] ?? '';
             if ($phone) {
+                // El método público de WhatsAppService se llama send(), no sendText()
                 $wa = new WhatsAppService();
-                $wa->sendText($phone, $body);
+                $wa->send($phone, $body);
             }
         } catch (\Throwable $e) {
             error_log('[NotificationService::sendWhatsApp] ' . $e->getMessage());

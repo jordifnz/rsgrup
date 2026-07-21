@@ -9,33 +9,48 @@ class WhatsAppService
 
     public function __construct()
     {
-        $this->apiUrl   = $this->getSetting('evolution_api_url', '');
+        $this->apiUrl   = $this->getSetting('evolution_api_url',   '');
         $this->apiToken = $this->getSetting('evolution_api_token', '');
-        $this->instance = $this->getSetting('evolution_instance', '');
+        $this->instance = $this->getSetting('evolution_instance',  '');
     }
 
+    /**
+     * Lee un valor de rsgrup_settings.
+     * La tabla usa columnas setting_key / setting_value.
+     */
     private function getSetting(string $key, string $default = ''): string
     {
-        $row = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`=?', [$key]);
-        return $row ? $row['value'] : $default;
+        $row = Database::fetch(
+            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?',
+            [$key]
+        );
+        return $row ? (string)$row['setting_value'] : $default;
     }
 
+    /**
+     * Envía un mensaje de texto via Evolution API.
+     *
+     * @param string $phone   Número de teléfono (nacional o con prefijo)
+     * @param string $message Texto a enviar
+     */
     public function send(string $phone, string $message): bool
     {
         if (!$this->apiUrl || !$this->apiToken || !$this->instance) {
-            error_log('[WhatsAppService] Evolution API not configured.');
+            error_log('[WhatsAppService] Evolution API no configurada.');
             return false;
         }
 
-        // Normalize phone: remove spaces, dashes, +
+        // Normalizar teléfono: quitar espacios, guiones, +
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        // Ensure country code (Spain: 34)
-        if (strlen($phone) === 9) $phone = '34' . $phone;
+        // Añadir prefijo español si solo son 9 dígitos
+        if (strlen($phone) === 9) {
+            $phone = '34' . $phone;
+        }
 
         $url     = rtrim($this->apiUrl, '/') . '/message/sendText/' . urlencode($this->instance);
         $payload = json_encode([
-            'number'  => $phone . '@s.whatsapp.net',
-            'options' => ['delay' => 1200, 'presence' => 'composing'],
+            'number'      => $phone . '@s.whatsapp.net',
+            'options'     => ['delay' => 1200, 'presence' => 'composing'],
             'textMessage' => ['text' => $message],
         ]);
 
@@ -62,12 +77,22 @@ class WhatsAppService
         return false;
     }
 
+    /**
+     * Renderiza la plantilla de WhatsApp almacenada en settings.
+     *
+     * @param  array $vars [ 'nombre' => '...', 'entrega' => '...', ... ]
+     */
     public static function renderTemplate(array $vars): string
     {
-        $tpl = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`="whatsapp_template"');
-        $text = $tpl ? $tpl['value'] : 'Hola {{nombre}}, tu inscripción a {{entrega}} ha sido confirmada. Accede en: {{url}}';
+        $tpl = Database::fetch(
+            "SELECT setting_value FROM rsgrup_settings WHERE setting_key = 'whatsapp_template_enrollment'"
+        );
+        $text = $tpl
+            ? $tpl['setting_value']
+            : 'Hola {{nombre}}, tu inscripción a {{entrega}} ha sido confirmada el {{fecha}}. Accede en: {{sitio}}';
+
         foreach ($vars as $k => $v) {
-            $text = str_replace('{{'.$k.'}}', (string)$v, $text);
+            $text = str_replace('{{' . $k . '}}', (string)$v, $text);
         }
         return $text;
     }
