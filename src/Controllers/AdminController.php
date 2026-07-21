@@ -83,7 +83,6 @@ class AdminController
         $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        // pdf_file es el nombre de columna en rsgrup_deliveries
         $pdfFile = $_POST['existing_pdf'] ?? null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
@@ -96,10 +95,7 @@ class AdminController
             }
         }
 
-        $fields = [
-            $courseId,$title,$description,$slug,$type,$price,$paymentType,$examId,
-            $sortOrder,$notifyEmail,$notifyWa,$pdfFile,$active
-        ];
+        $fields = [$courseId,$title,$description,$slug,$type,$price,$paymentType,$examId,$sortOrder,$notifyEmail,$notifyWa,$pdfFile,$active];
 
         if ($id) {
             Database::execute(
@@ -295,7 +291,7 @@ class AdminController
 
         // Normalize color: always store with #
         foreach (['brand_accent_color', 'cert_name_color'] as $colorKey) {
-            if (isset($_POST[$colorKey]) && !empty($_POST[$colorKey])) {
+            if (!empty($_POST[$colorKey])) {
                 $c = ltrim($_POST[$colorKey], '#');
                 if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
                     $_POST[$colorKey] = '#' . strtolower($c);
@@ -309,15 +305,22 @@ class AdminController
             }
         }
 
+        // Claves permitidas — deben coincidir EXACTAMENTE con las claves
+        // en rsgrup_settings y con lo que leen los servicios PHP.
         $allowed = [
             'brand_accent_color',
-            'paypal_client_id','paypal_secret','paypal_mode',
-            'smtp_host','smtp_port','smtp_user','smtp_password','smtp_from_name','smtp_from_email',
-            'evolution_api_url','evolution_api_token','evolution_instance',
+            // PayPal  (PayPalService lee: paypal_client_id, paypal_client_secret, paypal_mode)
+            'paypal_client_id', 'paypal_client_secret', 'paypal_mode',
+            // SMTP    (MailService lee: smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_name, smtp_from_email)
+            'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from_name', 'smtp_from_email',
+            // WhatsApp / Evolution API
+            'evolution_api_url', 'evolution_api_token', 'evolution_instance',
             'wa_contact_number',
-            'email_template_subject','email_template_body',
+            // Plantillas de notificación
+            'email_template_subject', 'email_template_body',
             'whatsapp_template',
-            'cert_bg_path','cert_name_x','cert_name_y','cert_name_fontsize','cert_name_color',
+            // Certificado
+            'cert_bg_path', 'cert_name_x', 'cert_name_y', 'cert_name_fontsize', 'cert_name_color',
         ];
 
         foreach ($allowed as $key) {

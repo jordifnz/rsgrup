@@ -46,13 +46,20 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <summary>💳 PayPal</summary>
   <div class="settings-body">
     <div class="form-grid">
-      <div class="form-group"><label>Client ID</label><input type="text" name="paypal_client_id" value="<?= htmlspecialchars($s['paypal_client_id'] ?? '') ?>"></div>
-      <div class="form-group"><label>Secret</label><input type="password" name="paypal_secret" value="<?= htmlspecialchars($s['paypal_secret'] ?? '') ?>"></div>
+      <div class="form-group">
+        <label>Client ID</label>
+        <input type="text" name="paypal_client_id" value="<?= htmlspecialchars($s['paypal_client_id'] ?? '') ?>">
+      </div>
+      <div class="form-group">
+        <label>Client Secret</label>
+        <!-- name=paypal_client_secret coincide con la clave en rsgrup_settings y PayPalService -->
+        <input type="password" name="paypal_client_secret" value="<?= htmlspecialchars($s['paypal_client_secret'] ?? '') ?>">
+      </div>
       <div class="form-group">
         <label>Modo</label>
         <select name="paypal_mode">
-          <option value="sandbox" <?= ($s['paypal_mode']??'sandbox')==='sandbox'?'selected':'' ?>>Sandbox (pruebas)</option>
-          <option value="live"    <?= ($s['paypal_mode']??'')==='live'?'selected':'' ?>>Live (producción)</option>
+          <option value="sandbox" <?= ($s['paypal_mode'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox (pruebas)</option>
+          <option value="live"    <?= ($s['paypal_mode'] ?? '') === 'live' ? 'selected' : '' ?>>Live (producción)</option>
         </select>
       </div>
     </div>
@@ -67,7 +74,11 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       <div class="form-group"><label>Host SMTP</label><input type="text" name="smtp_host" value="<?= htmlspecialchars($s['smtp_host'] ?? '') ?>" placeholder="smtp.gmail.com"></div>
       <div class="form-group"><label>Puerto</label><input type="number" name="smtp_port" value="<?= htmlspecialchars($s['smtp_port'] ?? '587') ?>"></div>
       <div class="form-group"><label>Usuario</label><input type="text" name="smtp_user" value="<?= htmlspecialchars($s['smtp_user'] ?? '') ?>"></div>
-      <div class="form-group"><label>Contraseña</label><input type="password" name="smtp_password" value="<?= htmlspecialchars($s['smtp_password'] ?? '') ?>"></div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <!-- name=smtp_pass coincide con la clave en rsgrup_settings y MailService -->
+        <input type="password" name="smtp_pass" value="<?= htmlspecialchars($s['smtp_pass'] ?? '') ?>">
+      </div>
       <div class="form-group"><label>Nombre remitente</label><input type="text" name="smtp_from_name" value="<?= htmlspecialchars($s['smtp_from_name'] ?? 'RSGrup') ?>"></div>
       <div class="form-group"><label>Email remitente</label><input type="email" name="smtp_from_email" value="<?= htmlspecialchars($s['smtp_from_email'] ?? '') ?>"></div>
     </div>
@@ -103,17 +114,17 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <div class="settings-body">
     <div class="form-group">
       <label>Asunto email</label>
-      <input type="text" name="email_template_subject" value="<?= htmlspecialchars($s['email_template_subject'] ?? 'Inscripción confirmada: {{entrega_titulo}}') ?>">
-      <small>Variables: <code>{{alumno_nombre}}</code> <code>{{alumno_email}}</code> <code>{{entrega_titulo}}</code> <code>{{curso_titulo}}</code> <code>{{fecha}}</code></small>
+      <input type="text" name="email_template_subject" value="<?= htmlspecialchars($s['email_template_subject'] ?? 'Inscripción confirmada: {{entrega}}') ?>">
+      <small>Variables: <code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}</code> <code>{{entrega}}</code> <code>{{fecha}}</code> <code>{{precio}}</code> <code>{{sitio}}</code></small>
     </div>
     <div class="form-group">
       <label>Cuerpo email (HTML)</label>
-      <textarea name="email_template_body" class="wysiwyg" rows="8"><?= htmlspecialchars($s['email_template_body'] ?? '') ?></textarea>
+      <textarea name="email_template_body" class="wysiwyg" rows="8"><?= htmlspecialchars($s['email_template_body'] ?? $s['email_template'] ?? '') ?></textarea>
     </div>
     <div class="form-group">
       <label>Plantilla WhatsApp (texto plano)</label>
       <textarea name="whatsapp_template" rows="4" style="font-family:monospace"><?= htmlspecialchars($s['whatsapp_template'] ?? '') ?></textarea>
-      <small>Variables: <code>{{alumno_nombre}}</code> <code>{{entrega_titulo}}</code> <code>{{fecha}}</code></small>
+      <small>Variables: <code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{entrega}}</code> <code>{{fecha}}</code> <code>{{precio}}</code> <code>{{sitio}}</code></small>
     </div>
   </div>
 </details>
@@ -127,11 +138,8 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       <label>Imagen de fondo del título (PNG apaisado recomendado)</label>
       <input type="file" name="cert_bg" accept="image/png,image/jpeg" id="cert-bg-input">
       <?php
-        // Mostrar preview de la imagen ya guardada
         $certBgUrl = '';
         if (!empty($s['cert_bg_path'])) {
-            // cert_bg_path se almacena como /uploads/certificates/background.png
-            // BASE_URL ya contiene el dominio
             $certBgUrl = rtrim(BASE_URL, '/') . $s['cert_bg_path'];
         }
       ?>
@@ -145,7 +153,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     <div class="form-grid">
       <div class="form-group"><label>Posición X (px)</label><input type="number" name="cert_name_x" value="<?= htmlspecialchars($s['cert_name_x'] ?? '400') ?>"></div>
       <div class="form-group"><label>Posición Y (px)</label><input type="number" name="cert_name_y" value="<?= htmlspecialchars($s['cert_name_y'] ?? '300') ?>"></div>
-      <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="cert_name_fontsize" value="<?= htmlspecialchars($s['cert_name_fontsize'] ?? '36') ?>"></div>
+      <div class="form-group"><label>Tamaño fuente (px)</label><input type="number" name="cert_name_fontsize" value="<?= htmlspecialchars($s['cert_name_fontsize'] ?? $s['certificate_name_font_size'] ?? '36') ?>"></div>
       <div class="form-group">
         <label>Color texto</label>
         <div style="display:flex;align-items:center;gap:.5rem">
@@ -169,21 +177,21 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     <div id="cert-preview-wrap" style="display:none;margin-top:1rem">
       <canvas id="cert-canvas" style="max-width:100%;border-radius:8px;border:1px solid var(--color-border);box-shadow:var(--shadow-md)"></canvas>
       <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:.5rem">
-        Vista previa con nombre de ejemplo &middot; Ajusta coordenadas y pulsa de nuevo.
+        Vista previa con nombre de ejemplo · Ajusta coordenadas y pulsa de nuevo.
       </p>
     </div>
 
   </div>
 </details>
 
-<!-- BOTÓN SUBMIT dentro del form -->
+<!-- BOTÓN SUBMIT -->
 <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--color-border)">
   <button type="submit" class="btn btn-primary">💾 Guardar todos los ajustes</button>
 </div>
 
-</form><!-- FIN form principal -->
+</form>
 
-<!-- TOKENS API — forms propios, fuera del form principal -->
+<!-- TOKENS API —  formularios propios, fuera del form principal -->
 <details class="settings-section" style="margin-top:1.5rem">
   <summary>🔑 Tokens API</summary>
   <div class="settings-body">
@@ -220,43 +228,25 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </details>
 
 <script>
-// ── Color pickers con sincronización bidireccional ──────────────────────────
 function syncColorPair(pickerId, hexId) {
   var picker = document.getElementById(pickerId);
   var hex    = document.getElementById(hexId);
   if (!picker || !hex) return;
-
-  picker.addEventListener('input', function() {
-    hex.value = this.value;
-  });
+  picker.addEventListener('input', function() { hex.value = this.value; });
   hex.addEventListener('input', function() {
     var v = this.value.trim();
     if (!v.startsWith('#')) v = '#' + v;
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-      picker.value = v;
-    }
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) picker.value = v;
   });
-  // Sync hidden cert_name_color from hex companion
-  if (hexId === 'hex-cert-color') {
-    hex.addEventListener('input', function() {
-      picker.dispatchEvent(new Event('input'));
-    });
-  }
 }
-
 syncColorPair('pick-brand',      'hex-brand');
 syncColorPair('pick-cert-color', 'hex-cert-color');
-
-// Sync hex-cert-color -> cert_name_color picker (the actual submitted field)
 document.getElementById('hex-cert-color')?.addEventListener('input', function() {
   var v = this.value.trim();
   if (!v.startsWith('#')) v = '#' + v;
-  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-    document.getElementById('pick-cert-color').value = v;
-  }
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById('pick-cert-color').value = v;
 });
 
-// ── Preview PNG en el input file antes de guardar ───────────────────────────
 document.getElementById('cert-bg-input')?.addEventListener('change', function() {
   var file = this.files[0];
   if (!file) return;
@@ -264,57 +254,43 @@ document.getElementById('cert-bg-input')?.addEventListener('change', function() 
   reader.onload = function(e) {
     var thumb = document.getElementById('cert-bg-thumb');
     var wrap  = document.getElementById('cert-bg-preview');
-    if (thumb) { thumb.src = e.target.result; }
-    if (wrap)  { wrap.style.display = ''; }
-    // Reutilizar en el canvas preview si ya está visible
-    if (document.getElementById('cert-preview-wrap').style.display !== 'none') {
-      previewCertificate(e.target.result);
-    }
+    if (thumb) thumb.src = e.target.result;
+    if (wrap)  wrap.style.display = '';
+    if (document.getElementById('cert-preview-wrap').style.display !== 'none') previewCertificate(e.target.result);
   };
   reader.readAsDataURL(file);
 });
 
-// ── Canvas preview del título ───────────────────────────────────────────────
 function previewCertificate(overrideSrc) {
   var savedBg  = <?= json_encode(!empty($s['cert_bg_path']) ? rtrim(BASE_URL, '/') . $s['cert_bg_path'] : '') ?>;
   var bgSrc    = overrideSrc || savedBg || '';
-  var posX     = parseInt(document.querySelector('[name=cert_name_x]').value)     || 400;
-  var posY     = parseInt(document.querySelector('[name=cert_name_y]').value)     || 300;
+  var posX     = parseInt(document.querySelector('[name=cert_name_x]').value)       || 400;
+  var posY     = parseInt(document.querySelector('[name=cert_name_y]').value)       || 300;
   var fontSize = parseInt(document.querySelector('[name=cert_name_fontsize]').value) || 36;
-  var color    = document.getElementById('pick-cert-color').value                || '#000000';
+  var color    = document.getElementById('pick-cert-color').value                  || '#000000';
   var wrap     = document.getElementById('cert-preview-wrap');
   var canvas   = document.getElementById('cert-canvas');
   var ctx      = canvas.getContext('2d');
-
   wrap.style.display = 'block';
-
   function drawName() {
-    ctx.font      = 'bold ' + fontSize + 'px Inter, sans-serif';
+    ctx.font = 'bold ' + fontSize + 'px Inter, sans-serif';
     ctx.fillStyle = color;
     ctx.textAlign = 'left';
     ctx.fillText('Alumno/a de Ejemplo', posX, posY);
   }
-
   if (bgSrc) {
     var img = new Image();
-    if (!overrideSrc) img.crossOrigin = 'anonymous'; // solo para URLs remotas
+    if (!overrideSrc) img.crossOrigin = 'anonymous';
     img.onload = function() {
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
-      drawName();
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0); drawName();
     };
-    img.onerror = function() {
-      drawPlaceholder(ctx, canvas);
-      drawName();
-    };
+    img.onerror = function() { drawPlaceholder(ctx, canvas); drawName(); };
     img.src = bgSrc;
   } else {
-    drawPlaceholder(ctx, canvas);
-    drawName();
+    drawPlaceholder(ctx, canvas); drawName();
   }
 }
-
 function drawPlaceholder(ctx, canvas) {
   canvas.width = 1200; canvas.height = 600;
   ctx.fillStyle = '#f3f0ec'; ctx.fillRect(0, 0, 1200, 600);
