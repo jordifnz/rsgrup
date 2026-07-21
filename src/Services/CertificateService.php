@@ -4,11 +4,11 @@ declare(strict_types=1);
 /**
  * CertificateService — genera el título PDF del alumno.
  *
- * Fuente: fuentes TTF incluidas en el repo (public/assets/fonts/).
- * Renderizado con imagettftext → anti-aliased, igual que la preview canvas.
- * La salida siempre es un PDF (usando FPDF vendorizado).
+ * Fuente: busca un TTF bold real en este orden:
+ *   1. public/assets/fonts/ del propio repo (si se sube uno válido)
+ *   2. /tmp/rsgrup_fonts/ (caché automática — descargado la primera vez)
  *
- * NOTA: No se usan rutas del sistema (/usr/share/fonts/…) porque el hosting
+ * NOTA: No se usan rutas del sistema (/usr/share/fonts/…) porque Plesk
  * tiene open_basedir restringido a /var/www/vhosts/… y /tmp/.
  */
 
@@ -16,6 +16,11 @@ require_once BASE_PATH . '/src/Helpers/fpdf.php';
 
 class CertificateService
 {
+    /** URL pública del TTF que se descarga automáticamente la primera vez */
+    private const FONT_URL  = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans-Bold.ttf';
+    private const FONT_NAME = 'DejaVuSans-Bold.ttf';
+    private const FONT_CACHE_DIR = '/tmp/rsgrup_fonts';
+
     // ── Punto de entrada ────────────────────────────────────────────
 
     public function generate(array $user): void
@@ -66,7 +71,6 @@ class CertificateService
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
-        // Siempre generar PDF
         $this->outputPdf($img, $fullName);
         imagedestroy($img);
     }
@@ -74,25 +78,75 @@ class CertificateService
     // ── Resolución de fuente ────────────────────────────────────────
 
     /**
-     * Devuelve la ruta a un TTF bold válido incluido en el propio repo.
-     * Solo rutas dentro de BASE_PATH para respetar open_basedir del hosting.
+     * 1º busca TTFs válidos en el repo (public/assets/fonts/)
+     * 2º usa la caché en /tmp/rsgrup_fonts/ (descargando si no existe)
+     * Solo accede a rutas permitidas por open_basedir.
      */
     private function resolveFont(): ?string
     {
-        $candidates = [
+        // 1. Fuentes del repo
+        $repoCandidates = [
             BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/LiberationSans-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/NotoSans-Bold.ttf',
         ];
-
-        foreach ($candidates as $path) {
+        foreach ($repoCandidates as $path) {
             if (file_exists($path) && filesize($path) > 10_000 && $this->isTtfValid($path)) {
                 return $path;
             }
         }
 
-        return null;
+        // 2. Caché en /tmp (descarga automática si no existe)
+        return $this->getCachedFont();
+    }
+
+    /**
+     * Devuelve la ruta al TTF en /tmp/rsgrup_fonts/, descargándolo si es necesario.
+     * /tmp está dentro de open_basedir en Plesk.
+     */
+    private function getCachedFont(): ?string
+    {
+        $cacheDir  = self::FONT_CACHE_DIR;
+        $cachePath = $cacheDir . '/' . self::FONT_NAME;
+
+        // Ya existe y es válido
+        if (file_exists($cachePath) && filesize($cachePath) > 10_000 && $this->isTtfValid($cachePath)) {
+            return $cachePath;
+        }
+
+        // Crear directorio de caché
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+
+        // Descargar con file_get_contents (más portable que curl)
+        $context = stream_context_create([
+            'http' => [
+                'timeout'         => 10,
+                'follow_location' => true,
+                'user_agent'      => 'RSGrup/1.0',
+            ],
+            'ssl'  => ['verify_peer' => false],
+        ]);
+
+        $data = @file_get_contents(self::FONT_URL, false, $context);
+        if ($data === false || strlen($data) < 10_000) {
+            error_log('[RSGrup] No se pudo descargar la fuente desde ' . self::FONT_URL);
+            return null;
+        }
+
+        if (file_put_contents($cachePath, $data) === false) {
+            error_log('[RSGrup] No se pudo escribir la fuente en ' . $cachePath);
+            return null;
+        }
+
+        if (!$this->isTtfValid($cachePath)) {
+            @unlink($cachePath);
+            return null;
+        }
+
+        return $cachePath;
     }
 
     /**
@@ -106,7 +160,6 @@ class CertificateService
         fclose($fh);
         if (strlen($header) < 4) return false;
         $sfVersion = unpack('N', $header)[1];
-        // 0x00010000 = TTF, 0x4F54544F = OTF ('OTTO'), 0x74727565 = 'true' (Mac TTF)
         return in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true);
     }
 
