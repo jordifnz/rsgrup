@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    // ── Vista de una entrega ────────────────────────────────────────────────
+    // ── Vista de una entrega ──────────────────────────────────────────────────
     public function showDelivery(array $params = []): void
     {
         requireLogin();
@@ -42,7 +42,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/delivery.php';
     }
 
-    // ── Formulario de confirmación de inscripción ───────────────────────────
+    // ── Formulario de confirmación de inscripción ─────────────────────────────────
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -70,7 +70,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
-    // ── Iniciar inscripción / pago ──────────────────────────────────────────
+    // ── Iniciar inscripción / pago ────────────────────────────────────────────
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -117,7 +117,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: éxito ──────────────────────────────────────────────
+    // ── Callback PayPal: éxito ────────────────────────────────────────────────
     public function paypalSuccess(array $params = []): void
     {
         requireLogin();
@@ -146,7 +146,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: cancelación ────────────────────────────────────────
+    // ── Callback PayPal: cancelación ────────────────────────────────────────────
     public function paypalCancel(array $params = []): void
     {
         requireLogin();
@@ -157,7 +157,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga de PDF privado ─────────────────────────────────────────────
+    // ── Descarga de PDF privado ────────────────────────────────────────────────
     public function downloadPdf(array $params = []): void
     {
         requireLogin();
@@ -188,7 +188,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga del título/certificado ────────────────────────────────────
+    // ── Descarga del título/certificado ──────────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
         requireLogin();
@@ -206,7 +206,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Envío de examen ─────────────────────────────────────────────────────
+    // ── Envío de examen ───────────────────────────────────────────────────────
     public function submitExam(array $params = []): void
     {
         requireLogin();
@@ -219,14 +219,18 @@ class EnrollmentController
         $exam = ExamModel::findById($examId);
         if (!$exam) { http_response_code(404); exit; }
 
-        $enrollment = DeliveryModel::getEnrollment($userId, $exam['delivery_id']);
+        // La relación es delivery.exam_id → exams.id, no al revés.
+        // Buscamos la entrega que apunta a este examen.
+        $delivery = DeliveryModel::findByExamId($examId);
+        if (!$delivery) { http_response_code(404); exit; }
+
+        $enrollment = DeliveryModel::getEnrollment($userId, (int)$delivery['id']);
         if (!$enrollment || $enrollment['status'] !== 'active') {
             http_response_code(403); exit;
         }
 
         if (ExamModel::getLastAttempt($userId, $examId)) {
             $_SESSION['flash_error'] = 'Ya has realizado este examen.';
-            $delivery = DeliveryModel::findById($exam['delivery_id']);
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
             exit;
         }
@@ -235,7 +239,6 @@ class EnrollmentController
         ExamModel::saveAttempt($userId, $examId, $answers, $score);
         ActivityLogger::log($userId, 'exam_submitted', "Examen '{$exam['title']}' - Nota: {$score}");
 
-        $delivery = DeliveryModel::findById($exam['delivery_id']);
         $_SESSION['flash_success'] = "Examen enviado. Tu nota: {$score}%";
         header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
         exit;
