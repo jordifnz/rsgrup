@@ -3,9 +3,64 @@
   'use strict';
 
   /* ================================================================
+     TINYMCE HELPERS
+     initEditorInModal(editorId, content) — inicializa o rellena
+  ================================================================ */
+  window.setTinyOrTextarea = function (editorId, content) {
+    var ed = (window.tinymce) ? tinymce.get(editorId) : null;
+    if (ed) {
+      ed.setContent(content || '');
+    } else {
+      var el = document.getElementById(editorId);
+      if (el) el.value = content || '';
+    }
+  };
+
+  /**
+   * Inicializa TinyMCE en un elemento que acaba de hacerse visible.
+   * Si ya existe una instancia la destruye primero.
+   * Llama a onReady(editor) cuando el editor está listo.
+   */
+  window.initEditorInModal = function (editorId, content, onReady) {
+    if (typeof tinymce === 'undefined') {
+      // TinyMCE no cargado: fallback a textarea plano
+      var el = document.getElementById(editorId);
+      if (el) el.value = content || '';
+      if (typeof onReady === 'function') onReady(null);
+      return;
+    }
+
+    // Destruir instancia previa si existe
+    var existing = tinymce.get(editorId);
+    if (existing) {
+      existing.remove();
+    }
+
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    tinymce.init({
+      selector: '#' + editorId,
+      language: 'es',
+      language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@23.10.9/langs6/es.js',
+      plugins: 'lists link image code table',
+      toolbar: 'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image | code',
+      menubar: false,
+      branding: false,
+      promotion: false,
+      height: 260,
+      skin: isDark ? 'oxide-dark' : 'oxide',
+      content_css: isDark ? 'dark' : 'default',
+      setup: function (editor) {
+        editor.on('init', function () {
+          editor.setContent(content || '');
+          if (typeof onReady === 'function') onReady(editor);
+        });
+      }
+    });
+  };
+
+  /* ================================================================
      MODALS
-     Uso: openModal('modal-id') / closeModal('modal-id')
-     El elemento modal debe tener el atributo [hidden] y clase .modal
+     openModal(id) / closeModal(id)
   ================================================================ */
   window.openModal = function (id) {
     var el = document.getElementById(id);
@@ -13,9 +68,8 @@
     el.removeAttribute('hidden');
     el.classList.add('is-open');
     document.body.style.overflow = 'hidden';
-    // Focus en el primer campo interactivo del modal
     setTimeout(function () {
-      var first = el.querySelector('input:not([type=hidden]), select, textarea, button:not(.modal-close)');
+      var first = el.querySelector('input:not([type=hidden]), select, button:not(.modal-close)');
       if (first) first.focus();
     }, 50);
   };
@@ -23,12 +77,18 @@
   window.closeModal = function (id) {
     var el = document.getElementById(id);
     if (!el) return;
+    // Destruir TinyMCE dentro del modal al cerrar
+    if (window.tinymce) {
+      el.querySelectorAll('.wysiwyg-editor').forEach(function (ta) {
+        var ed = tinymce.get(ta.id);
+        if (ed) ed.remove();
+      });
+    }
     el.setAttribute('hidden', '');
     el.classList.remove('is-open');
     document.body.style.overflow = '';
   };
 
-  // Cerrar con Escape
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal.is-open').forEach(function (m) {
@@ -38,54 +98,12 @@
   });
 
   /* ================================================================
-     TINYMCE — inicialización centralizada
-     Se aplica a todos los elementos con clase .wysiwyg-editor
-     Callback window.onTinyMceReady(editorId) notifica a los modales
-  ================================================================ */
-  function initTinyMCE() {
-    if (typeof tinymce === 'undefined') return;
-
-    // Destruir instancias antiguas antes de re-inicializar (evita duplicados)
-    if (tinymce.editors && tinymce.editors.length) {
-      tinymce.remove('.wysiwyg-editor');
-    }
-
-    tinymce.init({
-      selector: '.wysiwyg-editor',
-      language: 'es',
-      language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@23.10.9/langs6/es.js',
-      plugins: 'lists link image code table',
-      toolbar: 'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image | code',
-      menubar: false,
-      branding: false,
-      promotion: false,
-      height: 260,
-      skin: document.documentElement.getAttribute('data-theme') === 'dark' ? 'oxide-dark' : 'oxide',
-      content_css: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
-      setup: function (editor) {
-        editor.on('init', function () {
-          // Notificar a los templates que TinyMCE está listo para este editor
-          if (typeof window.onTinyMceReady === 'function') {
-            window.onTinyMceReady(editor.id);
-          }
-        });
-      }
-    });
-  }
-
-  /* ================================================================
      LUCIDE ICONS
   ================================================================ */
   function initLucide() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
     }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initLucide);
-  } else {
-    initLucide();
   }
 
   /* ================================================================
@@ -113,6 +131,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     updateToggleIcon(root.getAttribute('data-theme') || 'light');
+    initLucide();
 
     if (toggle) {
       toggle.addEventListener('click', function () {
@@ -124,14 +143,16 @@
       });
     }
 
-    initLucide();
+    /* TinyMCE: SOLO inicializar en textareas visibles (fuera de modal) */
+    document.querySelectorAll('.wysiwyg-editor').forEach(function (ta) {
+      // Saltar si el textarea está dentro de un modal oculto
+      var insideHiddenModal = ta.closest('.modal[hidden], .modal:not(.is-open)');
+      if (!insideHiddenModal) {
+        window.initEditorInModal(ta.id, ta.value);
+      }
+    });
 
-    /* ---- TinyMCE: inicializar si hay editores en la página ---- */
-    if (document.querySelector('.wysiwyg-editor')) {
-      initTinyMCE();
-    }
-
-    /* ---- Cerrar nav mobile al hacer click fuera ---- */
+    /* Nav mobile */
     document.addEventListener('click', function (e) {
       var nav    = document.querySelector('.header-nav');
       var togBtn = document.querySelector('.nav-toggle');
@@ -142,7 +163,7 @@
       }
     });
 
-    /* ---- Flash auto-dismiss (3 s) ---- */
+    /* Flash auto-dismiss */
     document.querySelectorAll('.flash').forEach(function (el) {
       setTimeout(function () {
         el.style.transition = 'opacity 0.4s';
@@ -151,7 +172,7 @@
       }, 3000);
     });
 
-    /* ---- Confirm dialogs ---- */
+    /* Confirm dialogs */
     document.querySelectorAll('[data-confirm]').forEach(function (el) {
       el.addEventListener('click', function (e) {
         if (!window.confirm(el.dataset.confirm || '\u00bfEstas seguro?')) {

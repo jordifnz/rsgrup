@@ -55,25 +55,22 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <script>
-var _pendingCourse = null;
-
 function openCourseModal(c) {
   var isNew = !c || !c.id;
+
+  // 1. Rellenar campos simples ANTES de abrir el modal
   document.getElementById('modal-course-title').textContent = isNew ? 'Nuevo Curso' : 'Editar Curso';
-  document.getElementById('crs-id').value    = isNew ? '' : (c.id    || '');
-  document.getElementById('crs-title').value = isNew ? '' : (c.title || '');
-  document.getElementById('crs-active').checked = isNew ? true : !!parseInt(c.active);
+  document.getElementById('crs-id').value             = isNew ? '' : (c.id    || '');
+  document.getElementById('crs-title').value          = isNew ? '' : (c.title || '');
+  document.getElementById('crs-active').checked       = isNew ? true : (parseInt(c.active, 10) === 1);
 
   var descContent = isNew ? '' : (c.description || '');
-  var editor = window.tinymce ? tinymce.get('crs-desc') : null;
-  if (editor) {
-    editor.setContent(descContent);
-  } else {
-    document.getElementById('crs-desc').value = descContent;
-    _pendingCourse = { content: descContent, editorId: 'crs-desc' };
-  }
 
+  // 2. Abrir el modal (quita [hidden], hace el textarea visible)
   openModal('modal-course');
+
+  // 3. Inicializar TinyMCE AHORA que el elemento es visible, pasando el contenido
+  window.initEditorInModal('crs-desc', descContent);
 }
 </script>
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
