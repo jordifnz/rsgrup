@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ──────────────────────────────────────────────────────────
+    // ── Dashboard ──────────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ──────────────────────────────────────────────────────────
+    // ── Courses ──────────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,16 +53,51 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ─────────────────────────────────────────────────────
+    // ── Deliveries ──────────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
-        $deliveries = Database::fetchAll('SELECT d.*, e.title AS exam_title FROM rsgrup_deliveries d LEFT JOIN rsgrup_exams e ON e.id=d.exam_id ORDER BY d.sort_order ASC');
+        $deliveries = Database::fetchAll('SELECT d.*, c.title AS course_title, e.title AS exam_title FROM rsgrup_deliveries d LEFT JOIN rsgrup_courses c ON c.id=d.course_id LEFT JOIN rsgrup_exams e ON e.id=d.exam_id ORDER BY d.sort_order ASC');
         $exams      = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
         $courses    = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
         $metaTitle  = 'Entregas';
         $robots     = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/deliveries.php';
+    }
+
+    /** AJAX: devuelve JSON con los inscritos de una entrega */
+    public function deliveryEnrolled(array $params = []): void
+    {
+        $this->boot();
+        $deliveryId = Sanitize::int($params['id'] ?? 0);
+        $rows = Database::fetchAll(
+            'SELECT en.id AS enrollment_id, en.status, DATE_FORMAT(en.created_at,\'%d/%m/%Y\') AS enrolled_at,
+                    u.id AS user_id, u.name, u.surnames, u.email
+             FROM rsgrup_enrollments en
+             JOIN rsgrup_users u ON u.id = en.user_id
+             WHERE en.delivery_id = ?
+             ORDER BY en.created_at DESC',
+            [$deliveryId]
+        );
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($rows);
+        exit;
+    }
+
+    /** Dar de baja a un inscrito desde la vista de entregas */
+    public function deliveryUnenroll(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+        $deliveryId    = Sanitize::int($params['id']             ?? 0);
+        $enrollmentId  = Sanitize::int($params['enrollment_id']  ?? 0);
+        Database::execute(
+            'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND delivery_id=?',
+            [$enrollmentId, $deliveryId]
+        );
+        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} de entrega ID:{$deliveryId}");
+        $_SESSION['flash_success'] = 'Alumno dado de baja correctamente.';
+        header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
     public function saveDelivery(array $params = []): void
@@ -96,7 +131,6 @@ class AdminController
         }
 
         $fields = [$courseId,$title,$description,$slug,$type,$price,$paymentType,$examId,$sortOrder,$notifyEmail,$notifyWa,$pdfFile,$active];
-
         if ($id) {
             Database::execute(
                 'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,exam_id=?,sort_order=?,notify_email=?,notify_whatsapp=?,pdf_file=?,active=?,updated_at=NOW() WHERE id=?',
@@ -122,7 +156,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────────────────
+    // ── Exams ────────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -135,8 +169,8 @@ class AdminController
     public function examEditor(array $params = []): void
     {
         $this->boot();
-        $id        = Sanitize::int($params['id'] ?? 0);
-        $exam      = $id ? ExamModel::findWithQuestions($id) : null;
+        $id         = Sanitize::int($params['id'] ?? 0);
+        $exam       = $id ? ExamModel::findWithQuestions($id) : null;
         $deliveries = Database::fetchAll('SELECT id,title FROM rsgrup_deliveries ORDER BY sort_order');
         $metaTitle  = $id ? 'Editar Exámen' : 'Nuevo Exámen';
         $robots     = 'noindex,nofollow';
@@ -151,7 +185,6 @@ class AdminController
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
         $deliveryId  = Sanitize::int($_POST['delivery_id'] ?? 0) ?: null;
-
         if ($id) {
             Database::execute('UPDATE rsgrup_exams SET title=?,description=?,updated_at=NOW() WHERE id=?', [$title,$description,$id]);
         } else {
@@ -178,7 +211,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ──────────────────────────────────────────────────────────
+    // ── Users ────────────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -213,11 +246,32 @@ class AdminController
         $id   = Sanitize::int($params['id'] ?? 0);
         $user = UserModel::findById($id);
         if (!$user) { http_response_code(404); include BASE_PATH.'/public/404.php'; return; }
-        $enrollments = Database::fetchAll('SELECT en.*,d.title,d.type FROM rsgrup_enrollments en JOIN rsgrup_deliveries d ON d.id=en.delivery_id WHERE en.user_id=? ORDER BY en.created_at DESC', [$id]);
-        $logs        = Database::fetchAll('SELECT * FROM rsgrup_activity_log WHERE user_id=? ORDER BY created_at DESC LIMIT 50', [$id]);
-        $metaTitle   = 'Usuario: '.htmlspecialchars($user['name']);
-        $robots      = 'noindex,nofollow';
+        $enrollments = Database::fetchAll(
+            'SELECT en.*, d.title, d.type FROM rsgrup_enrollments en
+             JOIN rsgrup_deliveries d ON d.id=en.delivery_id
+             WHERE en.user_id=? ORDER BY en.created_at DESC',
+            [$id]
+        );
+        $logs      = Database::fetchAll('SELECT * FROM rsgrup_activity_log WHERE user_id=? ORDER BY created_at DESC LIMIT 50', [$id]);
+        $metaTitle = 'Usuario: '.htmlspecialchars($user['name']);
+        $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/user_detail.php';
+    }
+
+    /** Dar de baja una inscripción desde la vista de detalle de usuario */
+    public function userUnenroll(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+        $userId       = Sanitize::int($params['id']             ?? 0);
+        $enrollmentId = Sanitize::int($params['enrollment_id']  ?? 0);
+        Database::execute(
+            'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND user_id=?',
+            [$enrollmentId, $userId]
+        );
+        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} usuario ID:{$userId}");
+        $_SESSION['flash_success'] = 'Inscripción cancelada correctamente.';
+        header('Location: '.BASE_URL.'/admin/usuarios/'.$userId); exit;
     }
 
     public function saveUser(array $params = []): void
@@ -249,7 +303,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ─────────────────────────────────────────────────────────
+    // ── Activity ──────────────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -259,7 +313,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ─────────────────────────────────────────────────────────
+    // ── Settings ──────────────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -276,8 +330,6 @@ class AdminController
     {
         $this->boot();
         Csrf::verify();
-
-        // Certificate PNG/JPG upload
         if (!empty($_FILES['cert_bg']['tmp_name']) && $_FILES['cert_bg']['error'] === UPLOAD_ERR_OK) {
             $ext = strtolower(pathinfo($_FILES['cert_bg']['name'], PATHINFO_EXTENSION));
             if (in_array($ext, ['png','jpg','jpeg'])) {
@@ -288,41 +340,26 @@ class AdminController
                 $_POST['cert_bg_path'] = '/uploads/certificates/' . $filename;
             }
         }
-
-        // Normalize color: always store with #
         foreach (['brand_accent_color', 'cert_name_color'] as $colorKey) {
             if (!empty($_POST[$colorKey])) {
                 $c = ltrim($_POST[$colorKey], '#');
-                if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
-                    $_POST[$colorKey] = '#' . strtolower($c);
-                }
+                if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) $_POST[$colorKey] = '#' . strtolower($c);
             }
         }
         if (!empty($_POST['brand_accent_color_hex'])) {
             $c = ltrim($_POST['brand_accent_color_hex'], '#');
-            if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) {
-                $_POST['brand_accent_color'] = '#' . strtolower($c);
-            }
+            if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) $_POST['brand_accent_color'] = '#' . strtolower($c);
         }
-
-        // Claves permitidas — deben coincidir EXACTAMENTE con las claves
-        // en rsgrup_settings y con lo que leen los servicios PHP.
         $allowed = [
             'brand_accent_color',
-            // PayPal  (PayPalService lee: paypal_client_id, paypal_client_secret, paypal_mode)
             'paypal_client_id', 'paypal_client_secret', 'paypal_mode',
-            // SMTP    (MailService lee: smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_name, smtp_from_email)
             'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from_name', 'smtp_from_email',
-            // WhatsApp / Evolution API
             'evolution_api_url', 'evolution_api_token', 'evolution_instance',
             'wa_contact_number',
-            // Plantillas de notificación
             'email_template_subject', 'email_template_body',
             'whatsapp_template',
-            // Certificado
             'cert_bg_path', 'cert_name_x', 'cert_name_y', 'cert_name_fontsize', 'cert_name_color',
         ];
-
         foreach ($allowed as $key) {
             if (isset($_POST[$key])) {
                 $value = ($key === 'email_template_body')
@@ -334,7 +371,6 @@ class AdminController
                 );
             }
         }
-
         ActivityLogger::log($_SESSION['user_id'], 'settings_saved', 'Ajustes actualizados');
         $_SESSION['flash_success'] = 'Ajustes guardados correctamente.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;

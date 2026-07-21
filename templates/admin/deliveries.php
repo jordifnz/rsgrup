@@ -8,7 +8,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <table class="data-table">
-  <thead><tr><th>Orden</th><th>Tipo</th><th>Título</th><th>Curso</th><th>Precio</th><th>Pago</th><th>Examen</th><th>Email</th><th>WA</th><th>Activa</th><th>Acciones</th></tr></thead>
+  <thead><tr><th>Orden</th><th>Tipo</th><th>Título</th><th>Curso</th><th>Precio</th><th>Pago</th><th>Examen</th><th>Email</th><th>WA</th><th>Activa</th><th>Inscritos</th><th>Acciones</th></tr></thead>
   <tbody>
   <?php foreach ($deliveries as $d): ?>
   <tr>
@@ -22,6 +22,12 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     <td><?= $d['notify_email']    ? '✅' : '—' ?></td>
     <td><?= $d['notify_whatsapp'] ? '✅' : '—' ?></td>
     <td><?= $d['active']          ? '✅' : '❌' ?></td>
+    <td>
+      <button class="btn btn-sm btn-secondary"
+        onclick="openEnrolledModal(<?= (int)$d['id'] ?>, <?= htmlspecialchars(json_encode($d['title']), ENT_QUOTES) ?>)">
+        Ver inscritos
+      </button>
+    </td>
     <td class="actions">
       <button class="btn btn-sm"
         onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">
@@ -39,7 +45,17 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </tbody>
 </table>
 
-<!-- Modal Entrega (en el DOM directamente, nunca clonado) -->
+<!-- Modal: Inscritos en una entrega -->
+<div id="modal-enrolled" class="modal" hidden>
+  <div class="modal-backdrop" onclick="closeModal('modal-enrolled')"></div>
+  <div class="modal-box modal-box--lg">
+    <button class="modal-close" onclick="closeModal('modal-enrolled')" aria-label="Cerrar">&times;</button>
+    <h2 id="modal-enrolled-title">Inscritos</h2>
+    <div id="modal-enrolled-body" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<!-- Modal Entrega -->
 <div id="modal-delivery" class="modal" hidden>
   <div class="modal-backdrop" onclick="closeModal('modal-delivery')"></div>
   <div class="modal-box modal-box--lg">
@@ -118,30 +134,66 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <script>
+// CSRF token disponible en PHP (renderizado inline para el fetch)
+var CSRF_TOKEN = <?= json_encode(\Csrf::generate()) ?>;
+var BASE_URL   = <?= json_encode(BASE_URL) ?>;
+
+function openEnrolledModal(deliveryId, deliveryTitle) {
+  document.getElementById('modal-enrolled-title').textContent = 'Inscritos: ' + deliveryTitle;
+  var body = document.getElementById('modal-enrolled-body');
+  body.innerHTML = '<p style="color:var(--color-text-muted)">Cargando…</p>';
+  openModal('modal-enrolled');
+
+  fetch(BASE_URL + '/admin/entregas/' + deliveryId + '/inscritos', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.length) {
+      body.innerHTML = '<p style="color:var(--color-text-muted);padding:.5rem 0">Sin alumnos inscritos.</p>';
+      return;
+    }
+    var rows = data.map(function(u) {
+      return '<tr>'
+        + '<td>' + escHtml(u.name + ' ' + u.surnames) + '</td>'
+        + '<td>' + escHtml(u.email) + '</td>'
+        + '<td><span class="badge">' + escHtml(u.status) + '</span></td>'
+        + '<td style="white-space:nowrap">' + u.enrolled_at + '</td>'
+        + '<td>'
+        + '<form method="POST" action="' + BASE_URL + '/admin/entregas/' + deliveryId + '/baja/' + u.enrollment_id + '" onsubmit="return confirm(\'¿Dar de baja a ' + escHtml(u.name) + ' de esta entrega?\')" style="display:inline">'
+        + '<input type="hidden" name="csrf_token" value="' + escHtml(CSRF_TOKEN) + '">'
+        + '<button type="submit" class="btn btn-sm btn-danger">Dar de baja</button>'
+        + '</form>'
+        + '</td>'
+        + '</tr>';
+    }).join('');
+    body.innerHTML = '<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Inscrito</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  })
+  .catch(function() {
+    body.innerHTML = '<p style="color:var(--color-danger)">Error al cargar los datos.</p>';
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function openDeliveryModal(d) {
   var isNew       = !d || !d.id;
   var descContent = isNew ? '' : (d.description || '');
-
-  // 1. Campos simples
   document.getElementById('modal-delivery-title').textContent   = isNew ? 'Nueva Entrega' : 'Editar Entrega';
   document.getElementById('dlv-id').value                       = isNew ? '' : (d.id          || '');
   document.getElementById('dlv-title').value                    = isNew ? '' : (d.title        || '');
   document.getElementById('dlv-price').value                    = isNew ? '0': (d.price        || '0');
   document.getElementById('dlv-sort_order').value               = isNew ? '0': (d.sort_order   || '0');
   document.getElementById('dlv-description').value              = descContent;
-
-  // Selects (usando setSelectVal de app.js)
   setSelectVal('dlv-course_id',    isNew ? '' : String(d.course_id     || ''));
   setSelectVal('dlv-type',         isNew ? 'entrega'  : (d.type          || 'entrega'));
   setSelectVal('dlv-payment_type', isNew ? 'online'   : (d.payment_type  || 'online'));
   setSelectVal('dlv-exam_id',      isNew ? '' : String(d.exam_id       || ''));
-
-  // Checkboxes
   document.getElementById('dlv-notify_email').checked    = isNew ? false : (parseInt(d.notify_email,    10) === 1);
   document.getElementById('dlv-notify_whatsapp').checked = isNew ? false : (parseInt(d.notify_whatsapp, 10) === 1);
   document.getElementById('dlv-active').checked          = isNew ? true  : (parseInt(d.active,          10) === 1);
-
-  // PDF actual
   var pdfSpan   = document.getElementById('dlv-pdf-current');
   var pdfHidden = document.getElementById('dlv-existing_pdf');
   if (!isNew && d.pdf_file) {
@@ -151,11 +203,7 @@ function openDeliveryModal(d) {
     pdfSpan.textContent = '';
     pdfHidden.value     = '';
   }
-
-  // 2. Abrir modal (quita [hidden] → textarea visible)
   openModal('modal-delivery');
-
-  // 3. Inicializar TinyMCE ahora que el elemento es visible
   initEditorInModal('dlv-description', descContent);
 }
 </script>

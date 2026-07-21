@@ -35,19 +35,20 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 
   <!-- Matrículas y entregas -->
   <div class="card">
-    <div class="card-header"><strong>Matr&iacute;culas y entregas</strong></div>
+    <div class="card-header"><strong>Matrículas y entregas</strong></div>
     <div class="card-body" style="padding:0">
       <?php if (empty($enrollments)): ?>
         <p style="padding:var(--space-5);color:var(--color-text-muted)">Sin entregas registradas.</p>
       <?php else: ?>
       <div style="overflow-x:auto">
-        <table class="data-table" style="min-width:480px">
+        <table class="data-table" style="min-width:520px">
           <thead>
             <tr>
               <th>Tipo</th>
               <th>Entrega</th>
               <th>Estado</th>
               <th>Fecha</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -57,6 +58,17 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
             <td><?= htmlspecialchars($e['title']) ?></td>
             <td><span class="badge"><?= htmlspecialchars($e['status']) ?></span></td>
             <td style="white-space:nowrap"><?= date('d/m/Y', strtotime($e['created_at'])) ?></td>
+            <td>
+              <?php if ($e['status'] === 'active'): ?>
+              <form method="POST"
+                    action="<?= BASE_URL ?>/admin/usuarios/<?= (int)$user['id'] ?>/baja/<?= (int)$e['id'] ?>"
+                    onsubmit="return confirm('¿Dar de baja la inscripción a &quot;<?= htmlspecialchars($e['title'], ENT_QUOTES) ?>&quot;?')"
+                    style="display:inline">
+                <?= \Csrf::field() ?>
+                <button type="submit" class="btn btn-sm btn-danger">Dar de baja</button>
+              </form>
+              <?php endif; ?>
+            </td>
           </tr>
           <?php endforeach; ?>
           </tbody>
