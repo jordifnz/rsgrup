@@ -34,18 +34,13 @@ class DeliveryModel
 
     /**
      * Checks if a user can enroll in a delivery.
-     * Rules:
-     * - Matricula: always enrollable (first step)
-     * - Any delivery: requires active matricula enrollment
-     * - Entrega/Practica: must have completed all previous deliveries (by sort_order)
-     * - Practica: also requires all entregas completed (exam passed or at least attempted)
      */
     public static function canEnroll(int $userId, int $deliveryId): array
     {
         $delivery = self::findById($deliveryId);
         if (!$delivery) return ['ok' => false, 'reason' => 'Entrega no encontrada.'];
 
-        // Check not already enrolled
+        // Check not already actively enrolled
         $existing = self::getEnrollment($userId, $deliveryId);
         if ($existing && $existing['status'] === 'active') {
             return ['ok' => false, 'reason' => 'Ya estás inscrito en esta entrega.'];
@@ -83,7 +78,6 @@ class DeliveryModel
             if (($prev['enrollment_status'] ?? '') !== 'active') {
                 return ['ok' => false, 'reason' => 'Debes inscribirte y completar las entregas anteriores en orden.'];
             }
-            // For entregas: must have done the exam
             if ($prev['type'] === 'entrega' && $prev['score'] === null && $prev['exam_id']) {
                 return ['ok' => false, 'reason' => 'Debes realizar el exámen de la entrega anterior antes de continuar.'];
             }
@@ -107,7 +101,10 @@ class DeliveryModel
 
     public static function getEnrollment(int $userId, int $deliveryId): ?array
     {
-        return Database::fetch('SELECT * FROM rsgrup_enrollments WHERE user_id=? AND delivery_id=?', [$userId, $deliveryId]) ?: null;
+        return Database::fetch(
+            'SELECT * FROM rsgrup_enrollments WHERE user_id=? AND delivery_id=?',
+            [$userId, $deliveryId]
+        ) ?: null;
     }
 
     public static function getEnrollmentById(int $id): ?array
@@ -115,38 +112,65 @@ class DeliveryModel
         return Database::fetch('SELECT * FROM rsgrup_enrollments WHERE id=?', [$id]) ?: null;
     }
 
-    public static function createEnrollment(int $userId, int $deliveryId, ?string $orderId, string $status): void
-    {
+    /**
+     * Crea o actualiza una inscripción.
+     *
+     * Si ya existe una fila (user_id, delivery_id) con status 'pending' o 'cancelled'
+     * (p.ej. el usuario fue a PayPal, canceló y reintenta), se actualiza en lugar de
+     * insertar una nueva, evitando el error de clave duplicada en uq_enrollment.
+     *
+     * Si la fila ya existe con status 'active', canEnroll() ya habrá bloqueado la llamada.
+     */
+    public static function createEnrollment(
+        int $userId, int $deliveryId, ?string $orderId, string $status
+    ): void {
         Database::execute(
-            'INSERT INTO rsgrup_enrollments (user_id,delivery_id,paypal_order_id,status,created_at,updated_at) VALUES (?,?,?,?,NOW(),NOW())',
+            'INSERT INTO rsgrup_enrollments
+                 (user_id, delivery_id, paypal_order_id, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+                 paypal_order_id = VALUES(paypal_order_id),
+                 status          = VALUES(status),
+                 updated_at      = NOW()',
             [$userId, $deliveryId, $orderId, $status]
         );
     }
 
     public static function findEnrollmentByOrder(string $orderId): ?array
     {
-        return Database::fetch('SELECT * FROM rsgrup_enrollments WHERE paypal_order_id=?', [$orderId]) ?: null;
+        return Database::fetch(
+            'SELECT * FROM rsgrup_enrollments WHERE paypal_order_id=?',
+            [$orderId]
+        ) ?: null;
     }
 
     public static function activateEnrollment(string $orderId): void
     {
-        Database::execute('UPDATE rsgrup_enrollments SET status="active",updated_at=NOW() WHERE paypal_order_id=?', [$orderId]);
+        Database::execute(
+            'UPDATE rsgrup_enrollments SET status="active", updated_at=NOW() WHERE paypal_order_id=?',
+            [$orderId]
+        );
     }
 
     public static function cancelEnrollment(string $orderId): void
     {
-        Database::execute('UPDATE rsgrup_enrollments SET status="cancelled",updated_at=NOW() WHERE paypal_order_id=?', [$orderId]);
+        Database::execute(
+            'UPDATE rsgrup_enrollments SET status="cancelled", updated_at=NOW() WHERE paypal_order_id=?',
+            [$orderId]
+        );
     }
 
     public static function hasCompletedAll(int $userId): bool
     {
-        // All active entregas enrolled and exams done
         $pending = Database::fetchColumn(
             'SELECT COUNT(*) FROM rsgrup_deliveries d
              LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
              LEFT JOIN rsgrup_exams ex ON ex.id=d.exam_id
              LEFT JOIN rsgrup_exam_attempts ea ON ea.exam_id=ex.id AND ea.user_id=?
-             WHERE d.active=1 AND d.type="entrega" AND (en.status IS NULL OR en.status!="active" OR (ex.id IS NOT NULL AND ea.id IS NULL))',
+             WHERE d.active=1
+               AND d.type="entrega"
+               AND (en.status IS NULL OR en.status!="active"
+                    OR (ex.id IS NOT NULL AND ea.id IS NULL))',
             [$userId, $userId]
         );
         return (int)$pending === 0;
