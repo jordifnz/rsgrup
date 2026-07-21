@@ -60,18 +60,25 @@ class ExamModel
         return round(($correct / count($questions)) * 100, 2);
     }
 
-    public static function saveAttempt(int $userId, int $examId, array $submitted, float $score): int
-    {
+    /**
+     * Guarda el intento de examen.
+     * $enrollmentId es obligatorio por la FK fk_attempts_enrollment.
+     */
+    public static function saveAttempt(
+        int $userId, int $examId, int $enrollmentId, array $submitted, float $score
+    ): int {
         Database::execute(
-            'INSERT INTO rsgrup_exam_attempts (user_id,exam_id,score,created_at) VALUES (?,?,?,NOW())',
-            [$userId, $examId, $score]
+            'INSERT INTO rsgrup_exam_attempts (user_id, exam_id, enrollment_id, score, created_at)
+             VALUES (?, ?, ?, ?, NOW())',
+            [$userId, $examId, $enrollmentId, $score]
         );
         $attemptId = (int) Database::lastInsertId();
 
         foreach ($submitted as $questionId => $answerIds) {
             foreach ((array)$answerIds as $answerId) {
                 Database::execute(
-                    'INSERT INTO rsgrup_exam_attempt_answers (attempt_id,question_id,answer_id) VALUES (?,?,?)',
+                    'INSERT INTO rsgrup_exam_attempt_answers (attempt_id, question_id, answer_id)
+                     VALUES (?, ?, ?)',
                     [$attemptId, (int)$questionId, (int)$answerId]
                 );
             }

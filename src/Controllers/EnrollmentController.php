@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    // ── Vista de una entrega ──────────────────────────────────────────────────
+    // ── Vista de una entrega ────────────────────────────────────────────────
     public function showDelivery(array $params = []): void
     {
         requireLogin();
@@ -42,7 +42,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/delivery.php';
     }
 
-    // ── Formulario de confirmación de inscripción ─────────────────────────────────
+    // ── Formulario de confirmación de inscripción ───────────────────────────
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -70,7 +70,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
-    // ── Iniciar inscripción / pago ────────────────────────────────────────────
+    // ── Iniciar inscripción / pago ──────────────────────────────────────────
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -117,7 +117,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: éxito ────────────────────────────────────────────────
+    // ── Callback PayPal: éxito ──────────────────────────────────────────────
     public function paypalSuccess(array $params = []): void
     {
         requireLogin();
@@ -146,7 +146,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: cancelación ────────────────────────────────────────────
+    // ── Callback PayPal: cancelación ────────────────────────────────────────
     public function paypalCancel(array $params = []): void
     {
         requireLogin();
@@ -157,7 +157,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga de PDF privado ────────────────────────────────────────────────
+    // ── Descarga de PDF privado ─────────────────────────────────────────────
     public function downloadPdf(array $params = []): void
     {
         requireLogin();
@@ -188,7 +188,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga del título/certificado ──────────────────────────────────────────
+    // ── Descarga del título/certificado ────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
         requireLogin();
@@ -206,7 +206,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Envío de examen ───────────────────────────────────────────────────────
+    // ── Envío de examen ─────────────────────────────────────────────────────
     public function submitExam(array $params = []): void
     {
         requireLogin();
@@ -220,7 +220,6 @@ class EnrollmentController
         if (!$exam) { http_response_code(404); exit; }
 
         // La relación es delivery.exam_id → exams.id, no al revés.
-        // Buscamos la entrega que apunta a este examen.
         $delivery = DeliveryModel::findByExamId($examId);
         if (!$delivery) { http_response_code(404); exit; }
 
@@ -236,7 +235,8 @@ class EnrollmentController
         }
 
         $score = ExamModel::evaluate($examId, $answers);
-        ExamModel::saveAttempt($userId, $examId, $answers, $score);
+        // Pasamos enrollment_id para satisfacer la FK fk_attempts_enrollment
+        ExamModel::saveAttempt($userId, $examId, (int)$enrollment['id'], $answers, $score);
         ActivityLogger::log($userId, 'exam_submitted', "Examen '{$exam['title']}' - Nota: {$score}");
 
         $_SESSION['flash_success'] = "Examen enviado. Tu nota: {$score}%";
