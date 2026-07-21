@@ -30,7 +30,6 @@ class CertificateService
             return;
         }
 
-        // Preservar canal alpha del PNG
         imagealphablending($img, true);
         imagesavealpha($img, true);
 
@@ -43,10 +42,9 @@ class CertificateService
         $fontPath = $this->findFont();
 
         if ($fontPath !== null) {
-            // TTF disponible: texto de alta calidad con el tamaño exacto configurado
             imagettftext($img, $fontSize, 0, $nameX, $nameY, $textColor, $fontPath, $fullName);
         } else {
-            // Sin TTF: renderizar en un canvas temporal grande y reescalar
+            // Sin TTF: escalar texto bitmap
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
@@ -60,27 +58,22 @@ class CertificateService
         imagedestroy($img);
     }
 
-    // ── Búsqueda dinámica de fuente TTF ────────────────────────────────────
-
-    /**
-     * Devuelve la ruta a una fuente TTF bold usable, o null si no hay ninguna.
-     * Prioridad: fuente en el repo → DejaVu del sistema → Liberation → cualquier TTF.
-     */
     private function findFont(): ?string
     {
         $candidates = [
-            // Fuente empaquetada en el repo (si se añade en el futuro)
-            BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf',
+            // Fuente empaquetada en el repo (primera prioridad)
+            BASE_PATH . '/public/assets/fonts/NotoSans-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/LiberationSans-Bold.ttf',
-            // Rutas habituales en Debian/Ubuntu
+            // Debian/Ubuntu
+            '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
             '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
             '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
-            // Rutas habituales en CentOS/RHEL
+            // CentOS/RHEL
+            '/usr/share/fonts/noto/NotoSans-Bold.ttf',
             '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
             '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
-            // macOS (entornos de desarrollo)
-            '/Library/Fonts/Arial Bold.ttf',
+            // macOS
             '/System/Library/Fonts/Helvetica.ttc',
         ];
 
@@ -90,99 +83,48 @@ class CertificateService
             }
         }
 
-        // Último recurso: cualquier TTF bold del sistema
-        $globs = [
-            '/usr/share/fonts/truetype/*/*/*Bold*.ttf',
-            '/usr/share/fonts/truetype/*/*Bold*.ttf',
-            '/usr/share/fonts/truetype/*Bold*.ttf',
-            '/usr/share/fonts/**/*Bold*.ttf',
-        ];
-        foreach ($globs as $pattern) {
-            $found = glob($pattern);
-            if (!empty($found)) {
-                return $found[0];
-            }
+        // Último recurso: glob
+        foreach (['/usr/share/fonts/truetype/*Bold*.ttf', '/usr/share/fonts/**/*Bold*.ttf'] as $p) {
+            $found = glob($p);
+            if (!empty($found)) return $found[0];
         }
 
         return null;
     }
 
-    // ── Fallback sin TTF ───────────────────────────────────────────────────
-
-    /**
-     * Cuando no hay fuente TTF, renderiza el texto con imagestring() en un
-     * canvas temporal grande y luego lo reescala sobre la imagen destino.
-     * No es tan nítido como TTF pero es legible a cualquier tamaño.
-     */
     private function drawTextFallback(
-        \GdImage $img,
-        string   $text,
-        int      $x,
-        int      $y,
-        int      $fontSize,
-        int      $textColor
+        \GdImage $img, string $text, int $x, int $y, int $fontSize, int $textColor
     ): void {
-        // imagestring con font=5 → glifos de ~9×15 px
-        $glyphW = 9;
         $glyphH = 15;
         $scale  = max(1, (int)round($fontSize / $glyphH));
-
-        $textLen  = strlen($text);
-        $tmpW     = $textLen * $glyphW + 4;
-        $tmpH     = $glyphH + 4;
-        $tmp      = imagecreatetruecolor($tmpW, $tmpH);
-
-        // Fondo transparente en el canvas temporal
-        $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
-        imagefill($tmp, 0, 0, $transparent);
+        $tmpW   = strlen($text) * 9 + 4;
+        $tmpH   = $glyphH + 4;
+        $tmp    = imagecreatetruecolor($tmpW, $tmpH);
+        $trans  = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
+        imagefill($tmp, 0, 0, $trans);
         imagesavealpha($tmp, true);
-
-        // Extraer componentes RGB del color
         $r = ($textColor >> 16) & 0xFF;
         $g = ($textColor >> 8)  & 0xFF;
         $b = $textColor         & 0xFF;
-        // imagecolorat devuelve un int compuesto; necesitamos el color en el tmp
         $c = imagecolorallocate($tmp, $r, $g, $b);
-
         imagestring($tmp, 5, 2, 2, $text, $c);
-
-        // Reescalar al tamaño deseado y copiar sobre la imagen principal
-        $dstW = $tmpW  * $scale;
-        $dstH = $tmpH  * $scale;
+        $dstW = $tmpW * $scale;
+        $dstH = $tmpH * $scale;
         imagecopyresampled($img, $tmp, $x, $y - $dstH, 0, 0, $dstW, $dstH, $tmpW, $tmpH);
-
         imagedestroy($tmp);
     }
 
-    // ── Resolución de ruta del fondo ───────────────────────────────────────
-
-    /**
-     * Acepta cert_bg_path con o sin el segmento /public:
-     *   /uploads/certificates/bg.png        → BASE_PATH/public/uploads/…
-     *   /public/uploads/certificates/bg.png → BASE_PATH/public/uploads/…
-     */
     private function resolveBgPath(string $path): string
     {
-        if (str_starts_with($path, BASE_PATH)) {
-            return $path;
-        }
-
+        if (str_starts_with($path, BASE_PATH)) return $path;
         $full = BASE_PATH . '/' . ltrim($path, '/');
-        if (file_exists($full)) {
-            return $full;
-        }
-
+        if (file_exists($full)) return $full;
         if (!str_starts_with(ltrim($path, '/'), 'public/')) {
             $withPublic = BASE_PATH . '/public/' . ltrim($path, '/');
-            if (file_exists($withPublic)) {
-                return $withPublic;
-            }
+            if (file_exists($withPublic)) return $withPublic;
         }
-
         return $full;
     }
-
-    // ── Salida PDF ─────────────────────────────────────────────────────────
 
     private function outputPdf(\GdImage $img, string $fullName): void
     {
@@ -194,8 +136,6 @@ class CertificateService
         $pdf->Output('D', 'titulo_' . $this->slug($fullName) . '.pdf');
         unlink($tmpImg);
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private function getSetting(string $key, string $default = ''): string
     {
@@ -209,7 +149,6 @@ class CertificateService
             return Sanitize::slug($text);
         }
         $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text) ?: $text;
-        $text = strtolower(preg_replace('/[^A-Za-z0-9]+/', '_', $text));
-        return trim($text, '_') ?: 'titulo';
+        return trim(strtolower(preg_replace('/[^A-Za-z0-9]+/', '_', $text)), '_') ?: 'titulo';
     }
 }
