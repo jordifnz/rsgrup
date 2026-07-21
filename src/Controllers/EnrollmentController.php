@@ -3,10 +3,6 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    /**
-     * GET /inscribir/{id}
-     * Muestra la página de confirmación antes de ir a PayPal (o inscribir práctica).
-     */
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -21,14 +17,13 @@ class EnrollmentController
 
         $userId = $_SESSION['user_id'];
 
-        // Si ya está inscrito, redirigir directamente a la entrega
+        // Si ya está activamente inscrito, redirigir directamente
         $enrollment = DeliveryModel::getEnrollment($userId, $deliveryId);
         if ($enrollment && $enrollment['status'] === 'active') {
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
             exit;
         }
 
-        // Verificar prerrequisitos
         $check = DeliveryModel::canEnroll($userId, $deliveryId);
 
         $metaTitle = 'Inscripción: ' . htmlspecialchars($delivery['title']);
@@ -36,10 +31,6 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
-    /**
-     * POST /inscribir
-     * Procesa la inscripción (con CSRF).
-     */
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -55,27 +46,34 @@ class EnrollmentController
             exit;
         }
 
-        // Check prerrequisitos
         $check = DeliveryModel::canEnroll($userId, $deliveryId);
         if (!$check['ok']) {
             $_SESSION['flash_error'] = $check['reason'];
-            header('Location: ' . BASE_URL . '/dashboard');
+            header('Location: ' . BASE_URL . '/inscribir/' . $deliveryId);
             exit;
         }
 
-        // Práctica: pago presencial, inscribir directamente sin PayPal
+        // Práctica: pago presencial, inscribir directamente
         if ($delivery['type'] === 'practica') {
             DeliveryModel::createEnrollment($userId, $deliveryId, null, 'active');
             ActivityLogger::log($userId, 'enrollment', 'Inscripción práctica: ' . $delivery['title']);
             NotificationService::send($userId, $delivery);
-            $_SESSION['flash_success'] = 'Inscrito correctamente a la práctica. El pago se realizará presencialmente.';
+            $_SESSION['flash_success'] = 'Inscrito correctamente. El pago se realizará presencialmente.';
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
             exit;
         }
 
-        // Matrícula y Entrega: PayPal
+        // Matrícula / Entrega: PayPal
         $paypal  = new PayPalService();
         $orderId = $paypal->createOrder($delivery, $userId);
+
+        // Si PayPal falla, volver al formulario con error claro
+        if (!$orderId) {
+            $_SESSION['flash_error'] = 'No se ha podido conectar con PayPal. Comprueba la configuración o inténtalo más tarde.';
+            header('Location: ' . BASE_URL . '/inscribir/' . $deliveryId);
+            exit;
+        }
+
         DeliveryModel::createEnrollment($userId, $deliveryId, $orderId, 'pending');
         $approveUrl = $paypal->getApproveUrl($orderId);
         header('Location: ' . $approveUrl);
@@ -134,7 +132,6 @@ class EnrollmentController
         }
 
         $delivery = DeliveryModel::findById($enrollment['delivery_id']);
-        // Columna correcta: pdf_file
         $pdfFile  = $delivery['pdf_file'] ?? '';
         if (!$pdfFile) { echo 'PDF no disponible.'; exit; }
 
@@ -177,7 +174,7 @@ class EnrollmentController
         $userId  = $_SESSION['user_id'];
         $answers = $_POST['answers'] ?? [];
 
-        $exam       = ExamModel::findById($examId);
+        $exam = ExamModel::findById($examId);
         if (!$exam) { http_response_code(404); exit; }
 
         $enrollment = DeliveryModel::getEnrollment($userId, $exam['delivery_id']);
@@ -185,7 +182,6 @@ class EnrollmentController
             http_response_code(403); exit;
         }
 
-        // Evitar repetir examen
         if (ExamModel::getLastAttempt($userId, $examId)) {
             $_SESSION['flash_error'] = 'Ya has realizado este examen.';
             $delivery = DeliveryModel::findById($exam['delivery_id']);
