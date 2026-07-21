@@ -14,35 +14,24 @@ class WhatsAppService
         $this->instance = $this->getSetting('evolution_instance',  '');
     }
 
-    /**
-     * Lee un valor de rsgrup_settings.
-     * La tabla usa columnas setting_key / setting_value.
-     */
+    // La tabla rsgrup_settings usa columnas `key` y `value`
     private function getSetting(string $key, string $default = ''): string
     {
         $row = Database::fetch(
-            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?',
+            'SELECT `value` FROM rsgrup_settings WHERE `key` = ?',
             [$key]
         );
-        return $row ? (string)$row['setting_value'] : $default;
+        return $row ? (string)$row['value'] : $default;
     }
 
-    /**
-     * Envía un mensaje de texto via Evolution API.
-     *
-     * @param string $phone   Número de teléfono (nacional o con prefijo)
-     * @param string $message Texto a enviar
-     */
     public function send(string $phone, string $message): bool
     {
         if (!$this->apiUrl || !$this->apiToken || !$this->instance) {
-            error_log('[WhatsAppService] Evolution API no configurada.');
+            error_log('[WhatsAppService] Evolution API no configurada (evolution_api_url, evolution_api_token, evolution_instance).');
             return false;
         }
 
-        // Normalizar teléfono: quitar espacios, guiones, +
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        // Añadir prefijo español si solo son 9 dígitos
         if (strlen($phone) === 9) {
             $phone = '34' . $phone;
         }
@@ -68,29 +57,26 @@ class WhatsAppService
         ]);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
         curl_close($ch);
 
-        if ($httpCode >= 200 && $httpCode < 300) {
-            return true;
+        if ($curlErr) {
+            error_log('[WhatsAppService] cURL error: ' . $curlErr);
+            return false;
         }
-        error_log('[WhatsAppService] HTTP ' . $httpCode . ': ' . $response);
-        return false;
+        if ($httpCode < 200 || $httpCode >= 300) {
+            error_log('[WhatsAppService] HTTP ' . $httpCode . ': ' . $response);
+            return false;
+        }
+        return true;
     }
 
-    /**
-     * Renderiza la plantilla de WhatsApp almacenada en settings.
-     *
-     * @param  array $vars [ 'nombre' => '...', 'entrega' => '...', ... ]
-     */
     public static function renderTemplate(array $vars): string
     {
-        $tpl = Database::fetch(
-            "SELECT setting_value FROM rsgrup_settings WHERE setting_key = 'whatsapp_template_enrollment'"
-        );
+        $tpl  = Database::fetch('SELECT `value` FROM rsgrup_settings WHERE `key` = ?', ['whatsapp_template']);
         $text = $tpl
-            ? $tpl['setting_value']
+            ? $tpl['value']
             : 'Hola {{nombre}}, tu inscripción a {{entrega}} ha sido confirmada el {{fecha}}. Accede en: {{sitio}}';
-
         foreach ($vars as $k => $v) {
             $text = str_replace('{{' . $k . '}}', (string)$v, $text);
         }

@@ -11,21 +11,22 @@ class PayPalService
     public function __construct()
     {
         $this->clientId = $this->getSetting('paypal_client_id');
-        $this->secret   = $this->getSetting('paypal_secret');
+        // Schema usa paypal_client_secret
+        $this->secret   = $this->getSetting('paypal_client_secret');
         $mode           = $this->getSetting('paypal_mode', 'sandbox');
         $this->baseUrl  = $mode === 'live'
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
     }
 
-    // La tabla usa setting_key / setting_value
+    // La tabla rsgrup_settings usa columnas `key` y `value`
     private function getSetting(string $key, string $default = ''): string
     {
         $row = Database::fetch(
-            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?',
+            'SELECT `value` FROM rsgrup_settings WHERE `key` = ?',
             [$key]
         );
-        return $row ? (string)$row['setting_value'] : $default;
+        return $row ? (string)$row['value'] : $default;
     }
 
     private function getAccessToken(): string
@@ -33,7 +34,7 @@ class PayPalService
         if ($this->accessToken) return $this->accessToken;
 
         if (!$this->clientId || !$this->secret) {
-            error_log('[PayPalService] client_id o secret no configurados en Ajustes.');
+            error_log('[PayPalService] paypal_client_id o paypal_client_secret no configurados en Ajustes.');
             return '';
         }
 
@@ -56,13 +57,11 @@ class PayPalService
             error_log('[PayPalService::getAccessToken] cURL error: ' . $curlErr);
             return '';
         }
-
         $response = json_decode($raw, true);
         if ($httpCode !== 200 || empty($response['access_token'])) {
             error_log('[PayPalService::getAccessToken] HTTP ' . $httpCode . ' - ' . $raw);
             return '';
         }
-
         $this->accessToken = $response['access_token'];
         return $this->accessToken;
     }
@@ -115,21 +114,14 @@ class PayPalService
             error_log('[PayPalService::createOrder] cURL error: ' . $curlErr);
             return '';
         }
-
         $response = json_decode($raw, true);
         if (empty($response['id'])) {
             error_log('[PayPalService::createOrder] HTTP ' . $httpCode . ' - ' . $raw);
             return '';
         }
-
         return $response['id'];
     }
 
-    /**
-     * Devuelve la URL de aprobación de PayPal para un orderId.
-     * El link 'approve' ya viene incluido en la respuesta de createOrder,
-     * así que lo extraemos directamente sin hacer una segunda llamada a la API.
-     */
     public function getApproveUrl(string $orderId): string
     {
         if (!$orderId) return BASE_URL . '/dashboard';
@@ -151,12 +143,10 @@ class PayPalService
             error_log('[PayPalService::getApproveUrl] cURL error: ' . $curlErr);
             return BASE_URL . '/dashboard';
         }
-
         $response = json_decode($raw, true);
         foreach ($response['links'] ?? [] as $link) {
             if (($link['rel'] ?? '') === 'approve') return $link['href'];
         }
-
         error_log('[PayPalService::getApproveUrl] No approve link. HTTP ' . $httpCode . ' - ' . $raw);
         return BASE_URL . '/dashboard';
     }
@@ -187,7 +177,6 @@ class PayPalService
             error_log('[PayPalService::captureOrder] cURL error: ' . $curlErr);
             return false;
         }
-
         $response = json_decode($raw, true);
         if (($response['status'] ?? '') !== 'COMPLETED') {
             error_log('[PayPalService::captureOrder] HTTP ' . $httpCode . ' - ' . $raw);

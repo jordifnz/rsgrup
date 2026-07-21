@@ -12,48 +12,36 @@ class MailService
 
     public function __construct()
     {
-        $this->host      = $this->getSetting('smtp_host',       'smtp.gmail.com');
-        $this->port      = (int)$this->getSetting('smtp_port',  '587');
-        $this->user      = $this->getSetting('smtp_user',       '');
-        $this->pass      = $this->getSetting('smtp_password',   '');
+        $this->host      = $this->getSetting('smtp_host',      'smtp.gmail.com');
+        $this->port      = (int)$this->getSetting('smtp_port', '587');
+        $this->user      = $this->getSetting('smtp_user',      '');
+        // Schema usa smtp_pass
+        $this->pass      = $this->getSetting('smtp_pass',      '');
         $this->fromEmail = $this->getSetting('smtp_from_email', '') ?: $this->user;
-        $this->fromName  = $this->getSetting('smtp_from_name',  'RSGrup');
+        $this->fromName  = $this->getSetting('smtp_from_name', 'RSGrup');
     }
 
-    /**
-     * Lee un valor de rsgrup_settings.
-     * La tabla usa columnas setting_key / setting_value.
-     */
+    // La tabla rsgrup_settings usa columnas `key` y `value`
     private function getSetting(string $key, string $default = ''): string
     {
         $row = Database::fetch(
-            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?',
+            'SELECT `value` FROM rsgrup_settings WHERE `key` = ?',
             [$key]
         );
-        return $row ? (string)$row['setting_value'] : $default;
+        return $row ? (string)$row['value'] : $default;
     }
 
-    /**
-     * Envía un e-mail HTML.
-     *
-     * @param string $toEmail   Dirección destino
-     * @param string $toName    Nombre destino
-     * @param string $subject   Asunto
-     * @param string $htmlBody  Cuerpo HTML
-     */
     public function send(string $toEmail, string $toName, string $subject, string $htmlBody): bool
     {
         if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
             return $this->sendViaPHPMailer($toEmail, $toName, $subject, $htmlBody);
         }
-
         error_log('[MailService] PHPMailer no encontrado. Instálalo: composer require phpmailer/phpmailer');
         return false;
     }
 
-    private function sendViaPHPMailer(
-        string $toEmail, string $toName, string $subject, string $htmlBody
-    ): bool {
+    private function sendViaPHPMailer(string $toEmail, string $toName, string $subject, string $htmlBody): bool
+    {
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
         try {
             $mail->isSMTP();
@@ -80,25 +68,13 @@ class MailService
         }
     }
 
-    /**
-     * Renderiza una plantilla almacenada en settings sustituyendo variables {{key}}.
-     *
-     * @param  string   $subjectKey  setting_key del asunto
-     * @param  string   $bodyKey     setting_key del cuerpo HTML
-     * @param  array    $vars        [ 'nombre' => '...', 'entrega' => '...', ... ]
-     * @return array{subject:string, body:string}
-     */
     public static function renderTemplate(string $subjectKey, string $bodyKey, array $vars): array
     {
-        $subjectRow = Database::fetch(
-            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?', [$subjectKey]
-        );
-        $bodyRow = Database::fetch(
-            'SELECT setting_value FROM rsgrup_settings WHERE setting_key = ?', [$bodyKey]
-        );
+        $subjectRow = Database::fetch('SELECT `value` FROM rsgrup_settings WHERE `key` = ?', [$subjectKey]);
+        $bodyRow    = Database::fetch('SELECT `value` FROM rsgrup_settings WHERE `key` = ?', [$bodyKey]);
 
-        $subject = $subjectRow ? $subjectRow['setting_value'] : 'Inscripción confirmada - RSGrup';
-        $body    = $bodyRow    ? $bodyRow['setting_value']    : self::defaultEmailTemplate();
+        $subject = $subjectRow ? $subjectRow['value'] : 'Inscripción confirmada - RSGrup';
+        $body    = $bodyRow    ? $bodyRow['value']    : self::defaultEmailTemplate();
 
         foreach ($vars as $k => $v) {
             $subject = str_replace('{{' . $k . '}}', (string)$v, $subject);
@@ -111,7 +87,7 @@ class MailService
     {
         return '<p>Hola {{nombre}},</p>'
              . '<p>Tu inscripción a <strong>{{entrega}}</strong> ha sido confirmada el {{fecha}}.</p>'
-             . '<p>Accede a tu cuenta en: <a href="{{sitio}}">{{sitio}}</a></p>'
+             . '<p>Accede en: <a href="{{sitio}}">{{sitio}}</a></p>'
              . '<p>Saludos,<br>El equipo de RSGrup</p>';
     }
 }
