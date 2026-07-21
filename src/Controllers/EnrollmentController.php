@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    // ── Vista de una entrega (página post-inscripción / contenido) ──────────
+    // ── Vista de una entrega ────────────────────────────────────────────────
     public function showDelivery(array $params = []): void
     {
         requireLogin();
@@ -18,18 +18,24 @@ class EnrollmentController
 
         $userId     = $_SESSION['user_id'];
         $enrollment = DeliveryModel::getEnrollment($userId, (int)$delivery['id']);
+        $isEnrolled = ($enrollment && $enrollment['status'] === 'active');
 
-        // Solo alumnos inscritos y activos pueden ver el contenido
-        if (!$enrollment || $enrollment['status'] !== 'active') {
-            $_SESSION['flash_error'] = 'No tienes acceso a este contenido.';
-            header('Location: ' . BASE_URL . '/inscribir/' . $delivery['id']);
-            exit;
+        // Calcular si puede inscribirse (para el CTA)
+        $canEnroll  = false;
+        $canEnrollReason = '';
+        if (!$isEnrolled) {
+            $check = DeliveryModel::canEnroll($userId, (int)$delivery['id']);
+            $canEnroll       = $check['ok'];
+            $canEnrollReason = $check['reason'];
         }
 
-        $exam        = $delivery['exam_id'] ? ExamModel::findById((int)$delivery['exam_id']) : null;
-        $lastAttempt = ($exam && $delivery['exam_id'])
-            ? ExamModel::getLastAttempt($userId, (int)$delivery['exam_id'])
-            : null;
+        // Examen y último intento (solo si inscrito)
+        $exam    = null;
+        $attempt = null;
+        if ($isEnrolled && $delivery['exam_id']) {
+            $exam    = ExamModel::findWithQuestions((int)$delivery['exam_id']);
+            $attempt = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
+        }
 
         $metaTitle = htmlspecialchars($delivery['title']);
         $robots    = 'noindex,nofollow';
@@ -51,7 +57,6 @@ class EnrollmentController
 
         $userId = $_SESSION['user_id'];
 
-        // Si ya está activamente inscrito, redirigir directamente
         $enrollment = DeliveryModel::getEnrollment($userId, $deliveryId);
         if ($enrollment && $enrollment['status'] === 'active') {
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
@@ -88,7 +93,6 @@ class EnrollmentController
             exit;
         }
 
-        // Práctica: pago presencial, inscribir directamente
         if ($delivery['type'] === 'practica') {
             DeliveryModel::createEnrollment($userId, $deliveryId, null, 'active');
             ActivityLogger::log($userId, 'enrollment', 'Inscripción práctica: ' . $delivery['title']);
@@ -98,11 +102,9 @@ class EnrollmentController
             exit;
         }
 
-        // Matrícula / Entrega: PayPal
         $paypal  = new PayPalService();
         $orderId = $paypal->createOrder($delivery, $userId);
 
-        // Si PayPal falla, volver al formulario con error claro
         if (!$orderId) {
             $_SESSION['flash_error'] = 'No se ha podido conectar con PayPal. Comprueba la configuración o inténtalo más tarde.';
             header('Location: ' . BASE_URL . '/inscribir/' . $deliveryId);
