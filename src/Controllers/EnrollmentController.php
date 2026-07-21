@@ -3,6 +3,40 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
+    // ── Vista de una entrega (página post-inscripción / contenido) ──────────
+    public function showDelivery(array $params = []): void
+    {
+        requireLogin();
+        $slug     = $params['slug'] ?? '';
+        $delivery = DeliveryModel::findBySlug($slug);
+
+        if (!$delivery) {
+            http_response_code(404);
+            include BASE_PATH . '/public/404.php';
+            return;
+        }
+
+        $userId     = $_SESSION['user_id'];
+        $enrollment = DeliveryModel::getEnrollmentByDeliverySlug($userId, $delivery['id']);
+
+        // Solo alumnos inscritos y activos pueden ver el contenido
+        if (!$enrollment || $enrollment['status'] !== 'active') {
+            $_SESSION['flash_error'] = 'No tienes acceso a este contenido.';
+            header('Location: ' . BASE_URL . '/inscribir/' . $delivery['id']);
+            exit;
+        }
+
+        $exam        = $delivery['exam_id'] ? ExamModel::findById($delivery['exam_id']) : null;
+        $lastAttempt = ($exam && $delivery['exam_id'])
+            ? ExamModel::getLastAttempt($userId, $delivery['exam_id'])
+            : null;
+
+        $metaTitle = htmlspecialchars($delivery['title']);
+        $robots    = 'noindex,nofollow';
+        include BASE_PATH . '/templates/student/delivery.php';
+    }
+
+    // ── Formulario de confirmación de inscripción ───────────────────────────
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -31,6 +65,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
+    // ── Iniciar inscripción / pago ──────────────────────────────────────────
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -80,6 +115,7 @@ class EnrollmentController
         exit;
     }
 
+    // ── Callback PayPal: éxito ──────────────────────────────────────────────
     public function paypalSuccess(array $params = []): void
     {
         requireLogin();
@@ -108,6 +144,7 @@ class EnrollmentController
         exit;
     }
 
+    // ── Callback PayPal: cancelación ────────────────────────────────────────
     public function paypalCancel(array $params = []): void
     {
         requireLogin();
@@ -118,6 +155,7 @@ class EnrollmentController
         exit;
     }
 
+    // ── Descarga de PDF privado ─────────────────────────────────────────────
     public function downloadPdf(array $params = []): void
     {
         requireLogin();
@@ -148,6 +186,7 @@ class EnrollmentController
         exit;
     }
 
+    // ── Descarga del título/certificado ────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
         requireLogin();
@@ -165,6 +204,7 @@ class EnrollmentController
         exit;
     }
 
+    // ── Envío de examen ─────────────────────────────────────────────────────
     public function submitExam(array $params = []): void
     {
         requireLogin();
