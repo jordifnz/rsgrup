@@ -10,9 +10,11 @@ declare(strict_types=1);
  *
  * NOTA: No se usan rutas del sistema (/usr/share/fonts/…) porque Plesk
  * tiene open_basedir restringido a /var/www/vhosts/… y /tmp/.
+ *
+ * NOTA 2: El require_once de fpdf.php está dentro del método outputPdf()
+ * (lazy load) para que un error de parse en fpdf.php no rompa TODOS los
+ * requests de la aplicación, solo los que generan un título PDF.
  */
-
-require_once BASE_PATH . '/src/Helpers/fpdf.php';
 
 class CertificateService
 {
@@ -201,13 +203,24 @@ class CertificateService
 
     private function outputPdf(\GdImage $img, string $fullName): void
     {
+        // Lazy load: fpdf.php solo se carga cuando se genera un título PDF.
+        // Esto evita que un error de parse en fpdf.php rompa todos los requests.
+        if (!class_exists('FPDF')) {
+            // Invalidar OPcache para este archivo antes de incluirlo
+            $fpdfPath = BASE_PATH . '/src/Helpers/fpdf.php';
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate($fpdfPath, true);
+            }
+            require_once $fpdfPath;
+        }
+
         $tmpImg = sys_get_temp_dir() . '/cert_' . uniqid() . '.png';
         imagepng($img, $tmpImg);
         $pdf = new \FPDF('L', 'mm', 'A4');
         $pdf->AddPage();
         $pdf->Image($tmpImg, 0, 0, 297, 210);
         $pdf->Output('D', 'titulo_' . $this->slug($fullName) . '.pdf');
-        unlink($tmpImg);
+        @unlink($tmpImg);
     }
 
     private function getSetting(string $key, string $default = ''): string
