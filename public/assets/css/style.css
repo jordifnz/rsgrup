@@ -43,6 +43,7 @@
   --color-success:#437a22;--color-error:#a12c7b;
   --color-sidebar-bg:#1c1b19;--color-sidebar-text:#cdccca;
   --color-sidebar-active:rgba(232,119,34,.15);
+  --color-input-bg:#fff;
 }
 
 /* ── Dark mode ────────────────────────────────────────────────── */
@@ -58,6 +59,7 @@
   --shadow-sm:0 1px 2px rgba(0,0,0,.25);
   --shadow-md:0 4px 12px rgba(0,0,0,.35);
   --shadow-lg:0 12px 32px rgba(0,0,0,.5);
+  --color-input-bg:#222120;
 }
 
 /* ── Reset base ───────────────────────────────────────────────── */
@@ -232,10 +234,11 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .form-group select,
 .form-group textarea{
   padding:.55rem var(--space-3);
-  background:var(--color-surface);
+  background:var(--color-input-bg, var(--color-surface));
   border:1.5px solid var(--color-border);
   border-radius:var(--radius-md);
   font-size:var(--text-sm);
+  color:var(--color-text);
   transition:border-color var(--transition),box-shadow var(--transition);
 }
 .form-group input:focus,
@@ -247,6 +250,10 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 }
 .form-group small{font-size:var(--text-xs);color:var(--color-text-muted)}
 .form-group code{background:var(--color-surface-2);padding:.1em .35em;border-radius:3px;font-size:.85em}
+.form-group--full { grid-column: 1 / -1; }
+.form-row{display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:center}
+.checkbox-label{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);cursor:pointer}
+.modal-actions{display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-6)}
 
 /* ── Campo password con ojo ───────────────────────────────────── */
 .password-field{
@@ -280,14 +287,14 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .badge-entrega{background:rgba(1,105,111,.12);color:#01696f}
 .badge-practica{background:rgba(122,57,187,.12);color:#7a39bb}
 
-/* ── Alertas ──────────────────────────────────────────────────── */
-.alert{
+/* ── Alertas / Flash ──────────────────────────────────────────── */
+.alert,.flash{
   padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);
   font-size:var(--text-sm);margin-bottom:var(--space-4);
 }
-.alert-success{background:rgba(67,122,34,.12);color:#437a22;border:1px solid rgba(67,122,34,.2)}
-.alert-error{background:rgba(161,44,123,.12);color:#a12c7b;border:1px solid rgba(161,44,123,.2)}
-.alert-info{background:rgba(0,100,148,.1);color:#006494;border:1px solid rgba(0,100,148,.2)}
+.alert-success,.flash-success{background:rgba(67,122,34,.12);color:#437a22;border:1px solid rgba(67,122,34,.2)}
+.alert-error,.flash-error{background:rgba(161,44,123,.12);color:#a12c7b;border:1px solid rgba(161,44,123,.2)}
+.alert-info,.flash-info{background:rgba(0,100,148,.1);color:#006494;border:1px solid rgba(0,100,148,.2)}
 
 /* ── Search bar ───────────────────────────────────────────────── */
 .search-bar{
@@ -305,6 +312,26 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .search-bar input:focus,.search-bar select:focus{
   outline:none;border-color:var(--color-brand);
 }
+
+/* ── Cards (detalle usuario, etc.) ───────────────────────────── */
+.card{
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  overflow:hidden;
+}
+.card-header{
+  padding:var(--space-4) var(--space-5);
+  background:var(--color-surface-2);
+  border-bottom:1px solid var(--color-border);
+  font-size:var(--text-sm);
+}
+.card-body{padding:var(--space-5)}
+.detail-table{width:100%;font-size:var(--text-sm)}
+.detail-table th{
+  width:140px;text-align:left;padding:var(--space-2) var(--space-3) var(--space-2) 0;
+  color:var(--color-text-muted);font-weight:500;vertical-align:top;
+}
+.detail-table td{padding:var(--space-2) 0;vertical-align:top}
 
 /* ── Settings sections ────────────────────────────────────────── */
 .settings-section{
@@ -328,29 +355,58 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .settings-hint{font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-4)}
 
 /* ── Modal ────────────────────────────────────────────────────── */
-.modal-overlay{
+/*
+  .modal         = el wrapper oculto (position:fixed, cubre toda la pantalla)
+  .modal-backdrop = fondo semitransparente clicable para cerrar
+  .modal-box     = el contenedor blanco/oscuro con el contenido, con scroll propio
+  .modal-box--lg = variante ancha (hasta 860px)
+*/
+.modal{
+  display:none;
   position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,.55);backdrop-filter:blur(3px);
-  display:flex;align-items:center;justify-content:center;
-  padding:var(--space-4);
+  align-items:flex-start;justify-content:center;
+  padding:var(--space-6) var(--space-4);
+  overflow-y:auto;           /* scroll en el overlay si el box es muy alto */
+}
+.modal.is-open{
+  display:flex;
+}
+.modal-backdrop{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);
+  z-index:0;
 }
 .modal-box{
-  position:relative;
+  position:relative;z-index:1;
   background:var(--color-surface);
   border:1px solid var(--color-border);
   border-radius:var(--radius-xl);
   box-shadow:var(--shadow-lg);
   padding:var(--space-8);
   width:100%;max-width:680px;
-  max-height:90dvh;overflow-y:auto;
+  margin:auto;               /* centra verticalmente cuando hay poco contenido */
+}
+.modal-box--lg{
+  max-width:860px;
 }
 .modal-close{
   position:absolute;top:var(--space-4);right:var(--space-4);
   font-size:1.5rem;line-height:1;
   color:var(--color-text-muted);
   transition:color var(--transition);
+  z-index:2;
 }
 .modal-close:hover{color:var(--color-text)}
+
+/* Alias legacy por si algún template usa .modal-overlay */
+.modal-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;
+  padding:var(--space-4);
+}
 
 /* ── Auth ─────────────────────────────────────────────────────── */
 .auth-wrap{min-height:100dvh;display:flex;align-items:center;justify-content:center;
@@ -392,16 +448,13 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .delivery-actions{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0}
 .price-tag{font-size:var(--text-xs);color:var(--color-text-muted)}
 
-/* ── Title CTA (dashboard alumno) ─────────────────────────────── */
+/* ── Title CTA ────────────────────────────────────────────────── */
 .title-cta{
   text-align:center;
   padding:var(--space-8) var(--space-4);
 }
 .title-cta p{
-  max-width:100%;
-  margin-left:auto;
-  margin-right:auto;
-  text-align:center;
+  max-width:100%;margin-left:auto;margin-right:auto;text-align:center;
 }
 
 /* ── Footer ───────────────────────────────────────────────────── */
@@ -410,16 +463,10 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
   border-top:1px solid var(--color-divider);
   margin-top:var(--space-8);
 }
-.site-footer .container{
-  text-align:center;
-}
+.site-footer .container{text-align:center}
 .site-footer p{
-  max-width:100%;
-  margin-left:auto;
-  margin-right:auto;
-  text-align:center;
-  color:var(--color-text-muted);
-  font-size:var(--text-sm);
+  max-width:100%;margin-left:auto;margin-right:auto;
+  text-align:center;color:var(--color-text-muted);font-size:var(--text-sm);
 }
 
 /* ── Empty state ──────────────────────────────────────────────── */
@@ -449,4 +496,6 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
   .admin-content{padding:var(--space-4)}
   .kpi-grid{grid-template-columns:repeat(2,1fr)}
   .form-grid{grid-template-columns:1fr}
+  .modal{padding:var(--space-4) var(--space-2)}
+  .modal-box{padding:var(--space-5)}
 }
