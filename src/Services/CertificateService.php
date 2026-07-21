@@ -5,11 +5,12 @@ class CertificateService
 {
     public function generate(array $user): void
     {
-        $bgPath   = BASE_PATH . $this->getSetting('cert_bg_path', '/public/uploads/certificates/background.png');
+        $rawPath  = $this->getSetting('cert_bg_path', '/public/uploads/certificates/background.png');
+        $bgPath   = $this->resolveBgPath($rawPath);
         $nameX    = (int)$this->getSetting('cert_name_x', '480');
         $nameY    = (int)$this->getSetting('cert_name_y', '300');
         $fontSize = (int)$this->getSetting('cert_name_fontsize', '40');
-        $color    = ltrim($this->getSetting('cert_name_color', '000000'), '#'); // strip # if present
+        $color    = ltrim($this->getSetting('cert_name_color', '000000'), '#');
         $fullName = trim(($user['name'] ?? '') . ' ' . ($user['surnames'] ?? ''));
 
         if (!file_exists($bgPath)) {
@@ -26,14 +27,12 @@ class CertificateService
         };
         if (!$img) { echo 'Error al cargar imagen de fondo.'; return; }
 
-        // Parse color (accepts 000000 or #000000)
         $hex = str_pad($color, 6, '0');
         $r   = hexdec(substr($hex, 0, 2));
         $g   = hexdec(substr($hex, 2, 2));
         $b   = hexdec(substr($hex, 4, 2));
         $textColor = imagecolorallocate($img, $r, $g, $b);
 
-        // Font
         $fontPath = BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf';
         if (!file_exists($fontPath)) {
             $fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
@@ -53,6 +52,41 @@ class CertificateService
             imagepng($img);
         }
         imagedestroy($img);
+    }
+
+    /**
+     * Resuelve la ruta absoluta del fondo del certificado.
+     *
+     * Acepta valores guardados con o sin el segmento /public:
+     *   /uploads/certificates/background.png   → BASE_PATH/public/uploads/...
+     *   /public/uploads/certificates/background.png → BASE_PATH/public/uploads/...
+     *   /ruta/absoluta/fuera/del/proyecto        → se usa tal cual
+     */
+    private function resolveBgPath(string $path): string
+    {
+        // Ruta ya absoluta (empieza por / y contiene el BASE_PATH real)
+        if (str_starts_with($path, BASE_PATH)) {
+            return $path;
+        }
+
+        // Ruta relativa: añadimos BASE_PATH
+        $full = BASE_PATH . '/' . ltrim($path, '/');
+
+        // Si ya existe tal cual, perfecto
+        if (file_exists($full)) {
+            return $full;
+        }
+
+        // Puede que falte /public: lo insertamos si no está
+        if (!str_starts_with(ltrim($path, '/'), 'public/')) {
+            $withPublic = BASE_PATH . '/public/' . ltrim($path, '/');
+            if (file_exists($withPublic)) {
+                return $withPublic;
+            }
+        }
+
+        // Devolvemos la ruta completa aunque no exista (el llamador verifica file_exists)
+        return $full;
     }
 
     private function outputPdf($img, string $fullName): void
