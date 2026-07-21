@@ -14,6 +14,17 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
+<style>
+.pwd-wrap { position:relative; display:flex; align-items:center; }
+.pwd-wrap input { flex:1; padding-right:2.5rem; }
+.pwd-eye {
+  position:absolute; right:.6rem;
+  background:none; border:none; padding:0; cursor:pointer;
+  color:var(--color-text-muted); display:flex; align-items:center;
+}
+.pwd-eye:hover { color:var(--color-text); }
+</style>
+
 <form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data" id="form-settings">
 <?= \Csrf::field() ?>
 
@@ -52,8 +63,10 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       </div>
       <div class="form-group">
         <label>Client Secret</label>
-        <!-- name=paypal_client_secret coincide con la clave en rsgrup_settings y PayPalService -->
-        <input type="password" name="paypal_client_secret" value="<?= htmlspecialchars($s['paypal_client_secret'] ?? '') ?>">
+        <div class="pwd-wrap">
+          <input type="password" name="paypal_client_secret" id="paypal_client_secret" value="<?= htmlspecialchars($s['paypal_client_secret'] ?? '') ?>">
+          <button type="button" class="pwd-eye" data-target="paypal_client_secret" aria-label="Ver/ocultar"><?= eyeIcon() ?></button>
+        </div>
       </div>
       <div class="form-group">
         <label>Modo</label>
@@ -76,8 +89,10 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       <div class="form-group"><label>Usuario</label><input type="text" name="smtp_user" value="<?= htmlspecialchars($s['smtp_user'] ?? '') ?>"></div>
       <div class="form-group">
         <label>Contraseña</label>
-        <!-- name=smtp_pass coincide con la clave en rsgrup_settings y MailService -->
-        <input type="password" name="smtp_pass" value="<?= htmlspecialchars($s['smtp_pass'] ?? '') ?>">
+        <div class="pwd-wrap">
+          <input type="password" name="smtp_pass" id="smtp_pass" value="<?= htmlspecialchars($s['smtp_pass'] ?? '') ?>">
+          <button type="button" class="pwd-eye" data-target="smtp_pass" aria-label="Ver/ocultar"><?= eyeIcon() ?></button>
+        </div>
       </div>
       <div class="form-group"><label>Nombre remitente</label><input type="text" name="smtp_from_name" value="<?= htmlspecialchars($s['smtp_from_name'] ?? 'RSGrup') ?>"></div>
       <div class="form-group"><label>Email remitente</label><input type="email" name="smtp_from_email" value="<?= htmlspecialchars($s['smtp_from_email'] ?? '') ?>"></div>
@@ -91,7 +106,13 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <div class="settings-body">
     <div class="form-grid">
       <div class="form-group"><label>URL Evolution API</label><input type="url" name="evolution_api_url" value="<?= htmlspecialchars($s['evolution_api_url'] ?? '') ?>" placeholder="https://api.tuservidor.com"></div>
-      <div class="form-group"><label>Token</label><input type="password" name="evolution_api_token" value="<?= htmlspecialchars($s['evolution_api_token'] ?? '') ?>"></div>
+      <div class="form-group">
+        <label>Token</label>
+        <div class="pwd-wrap">
+          <input type="password" name="evolution_api_token" id="evolution_api_token" value="<?= htmlspecialchars($s['evolution_api_token'] ?? '') ?>">
+          <button type="button" class="pwd-eye" data-target="evolution_api_token" aria-label="Ver/ocultar"><?= eyeIcon() ?></button>
+        </div>
+      </div>
       <div class="form-group"><label>Instancia</label><input type="text" name="evolution_instance" value="<?= htmlspecialchars($s['evolution_instance'] ?? '') ?>"></div>
     </div>
   </div>
@@ -109,22 +130,29 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </details>
 
 <!-- PLANTILLAS -->
+<?php
+$varsList = '<code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}</code> '
+          . '<code>{{entrega}}</code> <code>{{curso_titulo}}</code> <code>{{fecha}}</code> '
+          . '<code>{{precio}}</code> <code>{{sitio}}</code>';
+?>
 <details class="settings-section">
   <summary>✉️ Plantillas de notificación</summary>
   <div class="settings-body">
     <div class="form-group">
       <label>Asunto email</label>
-      <input type="text" name="email_template_subject" value="<?= htmlspecialchars($s['email_template_subject'] ?? 'Inscripción confirmada: {{entrega}}') ?>">
-      <small>Variables: <code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}</code> <code>{{entrega}}</code> <code>{{fecha}}</code> <code>{{precio}}</code> <code>{{sitio}}</code></small>
+      <input type="text" name="email_template_subject"
+             value="<?= htmlspecialchars($s['email_template_subject'] ?? 'Inscripción confirmada: {{entrega}}') ?>">
+      <small>Variables: <?= $varsList ?></small>
     </div>
     <div class="form-group">
       <label>Cuerpo email (HTML)</label>
       <textarea name="email_template_body" class="wysiwyg" rows="8"><?= htmlspecialchars($s['email_template_body'] ?? $s['email_template'] ?? '') ?></textarea>
+      <small>Variables: <?= $varsList ?></small>
     </div>
     <div class="form-group">
       <label>Plantilla WhatsApp (texto plano)</label>
       <textarea name="whatsapp_template" rows="4" style="font-family:monospace"><?= htmlspecialchars($s['whatsapp_template'] ?? '') ?></textarea>
-      <small>Variables: <code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{entrega}}</code> <code>{{fecha}}</code> <code>{{precio}}</code> <code>{{sitio}}</code></small>
+      <small>Variables: <?= $varsList ?></small>
     </div>
   </div>
 </details>
@@ -191,7 +219,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 
 </form>
 
-<!-- TOKENS API —  formularios propios, fuera del form principal -->
+<!-- TOKENS API -->
 <details class="settings-section" style="margin-top:1.5rem">
   <summary>🔑 Tokens API</summary>
   <div class="settings-body">
@@ -228,6 +256,24 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </details>
 
 <script>
+// ─ Ojos en campos password ────────────────────────────────────────
+document.querySelectorAll('.pwd-eye').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var inp = document.getElementById(this.dataset.target);
+    if (!inp) return;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    this.innerHTML = show ? eyeClosed() : eyeOpen();
+  });
+});
+function eyeOpen() {
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+function eyeClosed() {
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+}
+
+// ─ Colores ─────────────────────────────────────────────────────────────
 function syncColorPair(pickerId, hexId) {
   var picker = document.getElementById(pickerId);
   var hex    = document.getElementById(hexId);
@@ -247,6 +293,7 @@ document.getElementById('hex-cert-color')?.addEventListener('input', function() 
   if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById('pick-cert-color').value = v;
 });
 
+// ─ Preview de certificado ────────────────────────────────────────────
 document.getElementById('cert-bg-input')?.addEventListener('change', function() {
   var file = this.files[0];
   if (!file) return;
@@ -298,5 +345,11 @@ function drawPlaceholder(ctx, canvas) {
   ctx.fillText('(sin imagen de fondo — sube un PNG en el campo de arriba)', 600, 300);
 }
 </script>
+
+<?php
+function eyeIcon(): string {
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+?>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
