@@ -23,6 +23,34 @@ class WhatsAppService
         return $row ? (string)$row['value'] : $default;
     }
 
+    /**
+     * Normaliza el teléfono a formato internacional sin + ni espacios.
+     * Ejemplos: "612 345 678" → "34612345678"
+     *           "+34 612 345 678" → "34612345678"
+     *           "0034612345678"  → "34612345678"
+     *           "34612345678"    → "34612345678"  (ya correcto)
+     */
+    private function normalizePhone(string $phone): string
+    {
+        // Quitar todo lo que no sea dígito
+        $digits = preg_replace('/[^0-9]/', '', $phone);
+
+        // Quitar prefijo 0034
+        if (str_starts_with($digits, '0034')) {
+            $digits = substr($digits, 4);
+        }
+        // Quitar prefijo 34 si va seguido de 9 dígitos (número español sin el 34)
+        if (str_starts_with($digits, '34') && strlen($digits) === 11) {
+            $digits = substr($digits, 2);
+        }
+        // Si quedan 9 dígitos, añadir prefijo España
+        if (strlen($digits) === 9) {
+            $digits = '34' . $digits;
+        }
+
+        return $digits;
+    }
+
     public function send(string $phone, string $message): bool
     {
         if (!$this->apiUrl || !$this->apiToken || !$this->instance) {
@@ -30,12 +58,12 @@ class WhatsAppService
             return false;
         }
 
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (strlen($phone) === 9) {
-            $phone = '34' . $phone;
+        $phone = $this->normalizePhone($phone);
+        if (strlen($phone) < 10) {
+            error_log('[WhatsAppService] Teléfono inválido tras normalización: ' . $phone);
+            return false;
         }
 
-        // Evolution API v2: payload plano { number, text }
         $url     = rtrim($this->apiUrl, '/') . '/message/sendText/' . urlencode($this->instance);
         $payload = json_encode([
             'number' => $phone . '@s.whatsapp.net',

@@ -5,7 +5,7 @@ class NotificationService
 {
     public static function send(int $userId, array $delivery): void
     {
-        if (empty($delivery['notify_email']) && empty($delivery['notify_whatsapp'])) {
+        if (empty($delivery['notify_email']) && !(int)($delivery['notify_whatsapp'] ?? 0)) {
             return;
         }
 
@@ -17,7 +17,7 @@ class NotificationService
         if (!empty($delivery['notify_email'])) {
             self::sendEmail($user, $delivery, $vars);
         }
-        if (!empty($delivery['notify_whatsapp'])) {
+        if ((int)($delivery['notify_whatsapp'] ?? 0) === 1) {
             self::sendWhatsApp($user, $delivery, $vars);
         }
     }
@@ -40,7 +40,6 @@ class NotificationService
     private static function sendEmail(array $user, array $delivery, array $vars): void
     {
         try {
-            // Plantilla desde settings (columnas `key`/`value`)
             $tplRow  = Database::fetch(
                 "SELECT `value` FROM rsgrup_settings WHERE `key` = 'email_template'"
             );
@@ -65,10 +64,12 @@ class NotificationService
             $body = $tplRow ? $tplRow['value'] : self::defaultWhatsAppTemplate();
             $body = strtr($body, $vars);
 
-            $phone = $user['phone'] ?? '';
+            $phone = trim($user['phone'] ?? '');
             if ($phone) {
                 $wa = new WhatsAppService();
                 $wa->send($phone, $body);
+            } else {
+                error_log('[NotificationService::sendWhatsApp] Usuario ID ' . ($user['id'] ?? '?') . ' no tiene teléfono.');
             }
         } catch (\Throwable $e) {
             error_log('[NotificationService::sendWhatsApp] ' . $e->getMessage());
