@@ -100,9 +100,6 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    /**
-     * Genera un nombre de fichero seguro a partir del título de la entrega.
-     */
     private function pdfFilename(string $title, string $dir): string
     {
         $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
@@ -187,8 +184,8 @@ class AdminController
                     d.title AS delivery_title,
                     COUNT(q.id) AS question_count
              FROM rsgrup_exams e
-             LEFT JOIN rsgrup_deliveries d ON d.exam_id = e.id
-             LEFT JOIN rsgrup_questions q  ON q.exam_id = e.id
+             LEFT JOIN rsgrup_deliveries d      ON d.exam_id  = e.id
+             LEFT JOIN rsgrup_exam_questions q  ON q.exam_id  = e.id
              GROUP BY e.id, d.title
              ORDER BY e.id DESC'
         );
@@ -289,7 +286,6 @@ class AdminController
         include BASE_PATH . '/templates/admin/user_detail.php';
     }
 
-    /** Dar de baja una inscripción desde la vista de detalle de usuario */
     public function userUnenroll(array $params = []): void
     {
         $this->boot();
