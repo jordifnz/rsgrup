@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ──────────────────────────────────────────────────
+    // ── Dashboard ──────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ────────────────────────────────────────────────
+    // ── Courses ────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,7 +53,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ──────────────────────────────────────────────
+    // ── Deliveries ──────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -102,8 +102,6 @@ class AdminController
 
     /**
      * Genera un nombre de fichero seguro a partir del título de la entrega.
-     * Ejemplo: "Prueba Entrega 1" → "Prueba_Entrega_1.pdf"
-     * Si ya existe un fichero con ese nombre se añade un sufijo numérico.
      */
     private function pdfFilename(string $title, string $dir): string
     {
@@ -180,11 +178,20 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────────
+    // ── Exams ──────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
-        $exams     = Database::fetchAll('SELECT e.*, d.title AS delivery_title FROM rsgrup_exams e LEFT JOIN rsgrup_deliveries d ON d.exam_id=e.id ORDER BY e.id DESC');
+        $exams = Database::fetchAll(
+            'SELECT e.*,
+                    d.title AS delivery_title,
+                    COUNT(q.id) AS question_count
+             FROM rsgrup_exams e
+             LEFT JOIN rsgrup_deliveries d ON d.exam_id = e.id
+             LEFT JOIN rsgrup_questions q  ON q.exam_id = e.id
+             GROUP BY e.id, d.title
+             ORDER BY e.id DESC'
+        );
         $metaTitle = 'Exámenes';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/exams.php';
@@ -235,7 +242,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ──────────────────────────────────────────────────
+    // ── Users ──────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -327,7 +334,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ────────────────────────────────────────────────
+    // ── Activity ──────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -337,7 +344,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ────────────────────────────────────────────────
+    // ── Settings ──────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -361,7 +368,6 @@ class AdminController
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 $filename = 'background.' . $ext;
                 move_uploaded_file($_FILES['cert_bg']['tmp_name'], $uploadDir . $filename);
-                // Guardamos la ruta con /public para que BASE_PATH . cert_bg_path sea válida
                 $_POST['cert_bg_path'] = '/public/uploads/certificates/' . $filename;
             }
         }
