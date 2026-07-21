@@ -100,6 +100,32 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
+    /**
+     * Genera un nombre de fichero seguro a partir del título de la entrega.
+     * Ejemplo: "Prueba Entrega 1" → "Prueba_Entrega_1.pdf"
+     * Si ya existe un fichero con ese nombre se añade un sufijo numérico.
+     */
+    private function pdfFilename(string $title, string $dir): string
+    {
+        // Convertir a ASCII, reemplazar espacios por _ y eliminar caracteres no permitidos
+        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
+        $base = preg_replace('/\s+/', '_', trim($base));
+        $base = preg_replace('/[^A-Za-z0-9_\-]/', '', $base);
+        $base = trim($base, '_-') ?: 'entrega';
+
+        $filename = $base . '.pdf';
+        if (!file_exists($dir . '/' . $filename)) {
+            return $filename;
+        }
+        // Si ya existe, añadir sufijo numérico hasta encontrar nombre libre
+        $i = 2;
+        do {
+            $filename = $base . '_' . $i . '.pdf';
+            $i++;
+        } while (file_exists($dir . '/' . $filename));
+        return $filename;
+    }
+
     public function saveDelivery(array $params = []): void
     {
         $this->boot();
@@ -122,10 +148,10 @@ class AdminController
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
             if ($ext === 'pdf') {
-                $filename = uniqid('pdf_') . '.pdf';
-                $dest = BASE_PATH . '/private_files/' . $filename;
-                if (!is_dir(dirname($dest))) mkdir(dirname($dest), 0755, true);
-                move_uploaded_file($_FILES['pdf_file']['tmp_name'], $dest);
+                $dir = BASE_PATH . '/private_files';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $filename = $this->pdfFilename($title, $dir);
+                move_uploaded_file($_FILES['pdf_file']['tmp_name'], $dir . '/' . $filename);
                 $pdfFile = $filename;
             }
         }
