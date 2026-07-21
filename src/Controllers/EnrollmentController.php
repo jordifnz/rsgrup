@@ -17,7 +17,7 @@ class EnrollmentController
         }
 
         $userId     = $_SESSION['user_id'];
-        $enrollment = DeliveryModel::getEnrollmentByDeliverySlug($userId, $delivery['id']);
+        $enrollment = DeliveryModel::getEnrollment($userId, (int)$delivery['id']);
 
         // Solo alumnos inscritos y activos pueden ver el contenido
         if (!$enrollment || $enrollment['status'] !== 'active') {
@@ -26,9 +26,9 @@ class EnrollmentController
             exit;
         }
 
-        $exam        = $delivery['exam_id'] ? ExamModel::findById($delivery['exam_id']) : null;
+        $exam        = $delivery['exam_id'] ? ExamModel::findById((int)$delivery['exam_id']) : null;
         $lastAttempt = ($exam && $delivery['exam_id'])
-            ? ExamModel::getLastAttempt($userId, $delivery['exam_id'])
+            ? ExamModel::getLastAttempt($userId, (int)$delivery['exam_id'])
             : null;
 
         $metaTitle = htmlspecialchars($delivery['title']);

@@ -14,7 +14,6 @@ class WhatsAppService
         $this->instance = $this->getSetting('evolution_instance',  '');
     }
 
-    // La tabla rsgrup_settings usa columnas `key` y `value`
     private function getSetting(string $key, string $default = ''): string
     {
         $row = Database::fetch(
@@ -36,11 +35,11 @@ class WhatsAppService
             $phone = '34' . $phone;
         }
 
+        // Evolution API v2: payload plano { number, text }
         $url     = rtrim($this->apiUrl, '/') . '/message/sendText/' . urlencode($this->instance);
         $payload = json_encode([
-            'number'      => $phone . '@s.whatsapp.net',
-            'options'     => ['delay' => 1200, 'presence' => 'composing'],
-            'textMessage' => ['text' => $message],
+            'number' => $phone . '@s.whatsapp.net',
+            'text'   => $message,
         ]);
 
         $ch = curl_init($url);
