@@ -14,6 +14,15 @@ class DeliveryModel
     }
 
     /**
+     * Devuelve la entrega que tiene asignado el examen dado.
+     * La FK es deliveries.exam_id → exams.id, no al revés.
+     */
+    public static function findByExamId(int $examId): ?array
+    {
+        return Database::fetch('SELECT * FROM rsgrup_deliveries WHERE exam_id=?', [$examId]) ?: null;
+    }
+
+    /**
      * Returns all deliveries with enrollment status for a given user.
      */
     public static function getAllWithEnrollmentStatus(int $userId): array
