@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ──────────────────────────────────────────────────────
+    // ── Dashboard ──────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ──────────────────────────────────────────────────────
+    // ── Courses ────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,7 +53,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ──────────────────────────────────────────────────
+    // ── Deliveries ──────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -107,7 +107,6 @@ class AdminController
      */
     private function pdfFilename(string $title, string $dir): string
     {
-        // Convertir a ASCII, reemplazar espacios por _ y eliminar caracteres no permitidos
         $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
         $base = preg_replace('/\s+/', '_', trim($base));
         $base = preg_replace('/[^A-Za-z0-9_\-]/', '', $base);
@@ -117,7 +116,6 @@ class AdminController
         if (!file_exists($dir . '/' . $filename)) {
             return $filename;
         }
-        // Si ya existe, añadir sufijo numérico hasta encontrar nombre libre
         $i = 2;
         do {
             $filename = $base . '_' . $i . '.pdf';
@@ -182,7 +180,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ────────────────────────────────────────────────────────
+    // ── Exams ──────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -237,7 +235,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ────────────────────────────────────────────────────────
+    // ── Users ──────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -329,7 +327,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ──────────────────────────────────────────────────────
+    // ── Activity ────────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -339,7 +337,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ──────────────────────────────────────────────────────
+    // ── Settings ────────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -363,7 +361,8 @@ class AdminController
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 $filename = 'background.' . $ext;
                 move_uploaded_file($_FILES['cert_bg']['tmp_name'], $uploadDir . $filename);
-                $_POST['cert_bg_path'] = '/uploads/certificates/' . $filename;
+                // Guardamos la ruta con /public para que BASE_PATH . cert_bg_path sea válida
+                $_POST['cert_bg_path'] = '/public/uploads/certificates/' . $filename;
             }
         }
         foreach (['brand_accent_color', 'cert_name_color'] as $colorKey) {
