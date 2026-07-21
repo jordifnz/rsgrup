@@ -6,6 +6,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <h1>Gestión de Entregas</h1>
   <button class="btn btn-primary" onclick="openDeliveryModal(null)">+ Nueva entrega</button>
 </div>
+
 <table class="data-table">
   <thead><tr><th>Orden</th><th>Tipo</th><th>Título</th><th>Curso</th><th>Precio</th><th>Pago</th><th>Examen</th><th>Email</th><th>WA</th><th>Activa</th><th>Acciones</th></tr></thead>
   <tbody>
@@ -22,9 +23,15 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     <td><?= $d['notify_whatsapp'] ? '✅' : '—' ?></td>
     <td><?= $d['active']          ? '✅' : '❌' ?></td>
     <td class="actions">
-      <button class="btn btn-sm" onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">Editar</button>
-      <form action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/eliminar" method="POST" style="display:inline" onsubmit="return confirm('¿Eliminar esta entrega?')">
-        <?= Csrf::field() ?><button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+      <button class="btn btn-sm"
+        onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">
+        Editar
+      </button>
+      <form action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/eliminar"
+            method="POST" style="display:inline"
+            onsubmit="return confirm('¿Eliminar esta entrega?')">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
       </form>
     </td>
   </tr>
@@ -32,7 +39,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </tbody>
 </table>
 
-<!-- Modal Entrega -->
+<!-- Modal Entrega (en el DOM directamente, nunca clonado) -->
 <div id="modal-delivery" class="modal" hidden>
   <div class="modal-backdrop" onclick="closeModal('modal-delivery')"></div>
   <div class="modal-box modal-box--lg">
@@ -95,12 +102,12 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
       </div>
       <div class="form-group form-group--full">
         <label for="dlv-description">Descripción</label>
-        <textarea name="description" id="dlv-description" class="wysiwyg-editor" rows="5"></textarea>
+        <textarea name="description" id="dlv-description" rows="5"></textarea>
       </div>
       <div class="form-row">
-        <label class="checkbox-label"><input type="checkbox" name="notify_email" id="dlv-notify_email" value="1"> Notificar por e-mail</label>
+        <label class="checkbox-label"><input type="checkbox" name="notify_email"    id="dlv-notify_email"    value="1"> Notificar por e-mail</label>
         <label class="checkbox-label"><input type="checkbox" name="notify_whatsapp" id="dlv-notify_whatsapp" value="1"> Notificar por WhatsApp</label>
-        <label class="checkbox-label"><input type="checkbox" name="active" id="dlv-active" value="1" checked> Activa</label>
+        <label class="checkbox-label"><input type="checkbox" name="active"          id="dlv-active"          value="1" checked> Activa</label>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn" onclick="closeModal('modal-delivery')">Cancelar</button>
@@ -111,72 +118,46 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <script>
-var _dlvPending = null; // contenido TinyMCE pendiente si editor aún no listo
-
 function openDeliveryModal(d) {
-  var isNew = !d || !d.id;
-  document.getElementById('modal-delivery-title').textContent = isNew ? 'Nueva Entrega' : 'Editar Entrega';
+  var isNew       = !d || !d.id;
+  var descContent = isNew ? '' : (d.description || '');
 
-  // Campos de texto / número
-  document.getElementById('dlv-id').value         = isNew ? '' : (d.id || '');
-  document.getElementById('dlv-title').value      = isNew ? '' : (d.title || '');
-  document.getElementById('dlv-price').value      = isNew ? '0' : (d.price || '0');
-  document.getElementById('dlv-sort_order').value = isNew ? '0' : (d.sort_order || '0');
+  // 1. Campos simples
+  document.getElementById('modal-delivery-title').textContent   = isNew ? 'Nueva Entrega' : 'Editar Entrega';
+  document.getElementById('dlv-id').value                       = isNew ? '' : (d.id          || '');
+  document.getElementById('dlv-title').value                    = isNew ? '' : (d.title        || '');
+  document.getElementById('dlv-price').value                    = isNew ? '0': (d.price        || '0');
+  document.getElementById('dlv-sort_order').value               = isNew ? '0': (d.sort_order   || '0');
+  document.getElementById('dlv-description').value              = descContent;
 
-  // Selects
-  setSelectVal('dlv-course_id',    isNew ? '' : (d.course_id    || ''));
-  setSelectVal('dlv-type',         isNew ? 'entrega' : (d.type  || 'entrega'));
-  setSelectVal('dlv-payment_type', isNew ? 'online'  : (d.payment_type || 'online'));
-  setSelectVal('dlv-exam_id',      isNew ? '' : (d.exam_id      || ''));
+  // Selects (usando setSelectVal de app.js)
+  setSelectVal('dlv-course_id',    isNew ? '' : String(d.course_id     || ''));
+  setSelectVal('dlv-type',         isNew ? 'entrega'  : (d.type          || 'entrega'));
+  setSelectVal('dlv-payment_type', isNew ? 'online'   : (d.payment_type  || 'online'));
+  setSelectVal('dlv-exam_id',      isNew ? '' : String(d.exam_id       || ''));
 
   // Checkboxes
-  document.getElementById('dlv-notify_email').checked    = isNew ? false : !!parseInt(d.notify_email);
-  document.getElementById('dlv-notify_whatsapp').checked = isNew ? false : !!parseInt(d.notify_whatsapp);
-  document.getElementById('dlv-active').checked          = isNew ? true  : !!parseInt(d.active);
+  document.getElementById('dlv-notify_email').checked    = isNew ? false : (parseInt(d.notify_email,    10) === 1);
+  document.getElementById('dlv-notify_whatsapp').checked = isNew ? false : (parseInt(d.notify_whatsapp, 10) === 1);
+  document.getElementById('dlv-active').checked          = isNew ? true  : (parseInt(d.active,          10) === 1);
 
   // PDF actual
-  var pdfSpan = document.getElementById('dlv-pdf-current');
-  var existingInput = document.getElementById('dlv-existing_pdf');
-  if (isNew || !d.pdf_file) {
-    pdfSpan.textContent = '';
-    existingInput.value = '';
-  } else {
+  var pdfSpan   = document.getElementById('dlv-pdf-current');
+  var pdfHidden = document.getElementById('dlv-existing_pdf');
+  if (!isNew && d.pdf_file) {
     pdfSpan.textContent = 'Archivo actual: ' + d.pdf_file;
-    existingInput.value = d.pdf_file;
-  }
-
-  // TinyMCE
-  var descContent = isNew ? '' : (d.description || '');
-  var editor = window.tinymce ? tinymce.get('dlv-description') : null;
-  if (editor) {
-    editor.setContent(descContent);
+    pdfHidden.value     = d.pdf_file;
   } else {
-    document.getElementById('dlv-description').value = descContent;
-    _dlvPending = { content: descContent, editorId: 'dlv-description' };
+    pdfSpan.textContent = '';
+    pdfHidden.value     = '';
   }
 
+  // 2. Abrir modal (quita [hidden] → textarea visible)
   openModal('modal-delivery');
-}
 
-// Llamado desde app.js cuando TinyMCE termina de inicializar
-window.onTinyMceReady = function(editorId) {
-  // Para deliveries
-  if (_dlvPending && _dlvPending.editorId === editorId) {
-    var ed = tinymce.get(editorId);
-    if (ed) { ed.setContent(_dlvPending.content); _dlvPending = null; }
-  }
-  // Para courses (definido en courses.php)
-  if (typeof _pendingCourse !== 'undefined' && _pendingCourse && _pendingCourse.editorId === editorId) {
-    var ed2 = tinymce.get(editorId);
-    if (ed2) { ed2.setContent(_pendingCourse.content); _pendingCourse = null; }
-  }
-};
-
-function setSelectVal(id, val) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  var opt = el.querySelector('option[value="' + val + '"]');
-  el.value = opt ? val : (el.options[0] ? el.options[0].value : '');
+  // 3. Inicializar TinyMCE ahora que el elemento es visible
+  initEditorInModal('dlv-description', descContent);
 }
 </script>
+
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
