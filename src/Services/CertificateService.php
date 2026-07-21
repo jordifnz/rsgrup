@@ -3,12 +3,13 @@ declare(strict_types=1);
 
 /**
  * CertificateService — genera el título PNG/PDF del alumno.
- * Usa Inter Bold (mismo font que la vista previa canvas de Ajustes)
- * con imagettftext para texto anti-aliased de calidad.
+ *
+ * Fuente: DejaVu Sans Bold (disponible en el servidor vía php-gd).
+ * Renderizado con imagettftext → anti-aliased, igual que la preview canvas.
  */
 class CertificateService
 {
-    // ── Punto de entrada ───────────────────────────────────────────
+    // ── Punto de entrada ────────────────────────────────────────────
 
     public function generate(array $user): void
     {
@@ -51,10 +52,10 @@ class CertificateService
         $fontPath = $this->resolveFont();
 
         if ($fontPath !== null) {
-            // Anti-aliased con FreeType — igual que canvas 2D
+            // Anti-aliased con FreeType
             imagettftext($img, $fontSize, 0, $nameX, $nameY, $textColor, $fontPath, $fullName);
         } else {
-            // Fallback de último recurso (no debería ocurrir)
+            // Fallback último recurso
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
@@ -71,44 +72,62 @@ class CertificateService
     // ── Resolución de fuente ────────────────────────────────────────
 
     /**
-     * Devuelve la ruta a Inter-Bold.ttf (o compatible) con esta prioridad:
-     *  1. public/assets/fonts/Inter-Bold.ttf  (empaquetada en el repo)
-     *  2. Fuentes del sistema sans-serif bold (DejaVu, Liberation, Noto…)
-     *  3. Glob de emergencia
+     * Devuelve la ruta a un TTF bold válido (>10KB y que FreeType cargue).
+     * Prioridad: fuente del repo → sistema Debian/Ubuntu → sistema CentOS → glob.
      */
     private function resolveFont(): ?string
     {
-        // 1. Fuente empaquetada en el repo
-        $repoFont = BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf';
-        if (file_exists($repoFont) && filesize($repoFont) > 10_000) {
-            return $repoFont;
-        }
-
-        // 2. Fuentes del sistema (Debian/Ubuntu/CentOS)
-        $system = [
-            '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
+        $candidates = [
+            // Fuente del repo (si se sube manualmente un TTF válido en el futuro)
+            BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf',
+            BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf',
+            // Sistema — Debian / Ubuntu (instaladas con php-gd)
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
             '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
             '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
-            '/usr/share/fonts/noto/NotoSans-Bold.ttf',
+            // Sistema — CentOS / RHEL
             '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
             '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/noto/NotoSans-Bold.ttf',
+            // macOS (dev)
+            '/Library/Fonts/Arial Bold.ttf',
             '/System/Library/Fonts/Helvetica.ttc',
         ];
-        foreach ($system as $path) {
-            if (file_exists($path)) return $path;
+
+        foreach ($candidates as $path) {
+            if (file_exists($path) && filesize($path) > 10_000 && $this->isTtfValid($path)) {
+                return $path;
+            }
         }
 
-        // 3. Glob de emergencia
-        foreach (['/usr/share/fonts/truetype/*Bold*.ttf', '/usr/share/fonts/**/*Bold*.ttf'] as $pat) {
-            $found = glob($pat);
-            if (!empty($found)) return $found[0];
+        // Glob de emergencia
+        foreach (['*/dejavu/*Bold*.ttf', '*/liberation/*Bold*.ttf', '*/noto/*Bold*.ttf', '*/*Bold*.ttf'] as $pat) {
+            foreach (glob('/usr/share/fonts/' . $pat) ?: [] as $path) {
+                if (filesize($path) > 10_000 && $this->isTtfValid($path)) return $path;
+            }
         }
 
         return null;
     }
 
-    // ── Fallback bitmap (último recurso) ───────────────────────────
+    /**
+     * Comprueba que el archivo es un TTF/OTF real leyendo su magic number.
+     * Evita pasar archivos corruptos o truncados a imagettftext.
+     */
+    private function isTtfValid(string $path): bool
+    {
+        $fh = @fopen($path, 'rb');
+        if (!$fh) return false;
+        $header = fread($fh, 4);
+        fclose($fh);
+        if (strlen($header) < 4) return false;
+        $sfVersion = unpack('N', $header)[1];
+        // 0x00010000 = TTF, 0x4F54544F = OTF ('OTTO'), 0x74727565 = 'true' (Mac TTF)
+        return in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true);
+    }
+
+    // ── Fallback bitmap (último recurso) ────────────────────────────
 
     private function drawTextFallback(
         \GdImage $img, string $text, int $x, int $y, int $fontSize, int $textColor
