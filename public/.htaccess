@@ -66,8 +66,11 @@ RewriteRule ^ index.php [QSA,L]
     # HSTS: activa SOLO cuando tengas SSL estable
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-    # CSP — connect-src incluye jsdelivr (sourcemaps) y fonts.gstatic.com
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self'; base-uri 'self';"
+    # CSP
+    # form-action incluye los dominios de PayPal porque el POST /inscribir
+    # hace un redirect 302 hacia paypal.com, y algunos navegadores aplican
+    # form-action tambien al destino de la redireccion.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paypal.com; base-uri 'self';"
 
     Header always unset Server
     Header always unset X-Powered-By
@@ -82,7 +85,7 @@ RewriteRule ^ index.php [QSA,L]
     ExpiresByType application/javascript "access plus 1 month"
     ExpiresByType image/png              "access plus 1 year"
     ExpiresByType image/jpeg             "access plus 1 year"
-    ExpiresByType image/svg+xml          "access plus 1 year"
+    ExpiresByType image/svg+xml         "access plus 1 year"
     ExpiresByType image/webp             "access plus 1 year"
     ExpiresByType application/pdf        "access plus 1 week"
 </IfModule>
