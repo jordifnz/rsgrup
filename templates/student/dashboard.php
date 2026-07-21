@@ -79,7 +79,7 @@ $enrolledIds = array_column($userEnrolls, 'delivery_id');
               </div>
               <div class="delivery-actions">
                 <?php if($enrolled): ?>
-                  <a href="<?= BASE_URL ?>/entrega/<?= $d['id'] ?>" class="btn btn-sm btn-primary">Acceder</a>
+                  <a href="<?= BASE_URL ?>/entrega/<?= htmlspecialchars($d['slug']) ?>" class="btn btn-sm btn-primary">Acceder</a>
                 <?php else: ?>
                   <?php if($d['type']==='practica'): ?>
                     <span class="price-tag"><?= number_format((float)$d['price'],2,',','.') ?> &euro; (presencial)</span>
