@@ -4,10 +4,16 @@ declare(strict_types=1);
 /**
  * CertificateService — genera el título PDF del alumno.
  *
- * Fuente: DejaVu Sans Bold (disponible en el servidor vía php-gd).
+ * Fuente: fuentes TTF incluidas en el repo (public/assets/fonts/).
  * Renderizado con imagettftext → anti-aliased, igual que la preview canvas.
- * La salida siempre es un PDF (usando FPDF).
+ * La salida siempre es un PDF (usando FPDF vendorizado).
+ *
+ * NOTA: No se usan rutas del sistema (/usr/share/fonts/…) porque el hosting
+ * tiene open_basedir restringido a /var/www/vhosts/… y /tmp/.
  */
+
+require_once BASE_PATH . '/src/Helpers/fpdf.php';
+
 class CertificateService
 {
     // ── Punto de entrada ────────────────────────────────────────────
@@ -56,7 +62,7 @@ class CertificateService
             // Anti-aliased con FreeType
             imagettftext($img, $fontSize, 0, $nameX, $nameY, $textColor, $fontPath, $fullName);
         } else {
-            // Fallback último recurso
+            // Fallback último recurso (fuente bitmap de GD)
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
@@ -68,27 +74,16 @@ class CertificateService
     // ── Resolución de fuente ────────────────────────────────────────
 
     /**
-     * Devuelve la ruta a un TTF bold válido (>10KB y que FreeType cargue).
-     * Prioridad: fuente del repo → sistema Debian/Ubuntu → sistema CentOS → glob.
+     * Devuelve la ruta a un TTF bold válido incluido en el propio repo.
+     * Solo rutas dentro de BASE_PATH para respetar open_basedir del hosting.
      */
     private function resolveFont(): ?string
     {
         $candidates = [
-            // Fuente del repo (si se sube manualmente un TTF válido en el futuro)
             BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/DejaVuSans-Bold.ttf',
-            // Sistema — Debian / Ubuntu (instaladas con php-gd)
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-            '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
-            '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
-            '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
-            // Sistema — CentOS / RHEL
-            '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
-            '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
-            '/usr/share/fonts/noto/NotoSans-Bold.ttf',
-            // macOS (dev)
-            '/Library/Fonts/Arial Bold.ttf',
-            '/System/Library/Fonts/Helvetica.ttc',
+            BASE_PATH . '/public/assets/fonts/LiberationSans-Bold.ttf',
+            BASE_PATH . '/public/assets/fonts/NotoSans-Bold.ttf',
         ];
 
         foreach ($candidates as $path) {
@@ -97,19 +92,11 @@ class CertificateService
             }
         }
 
-        // Glob de emergencia
-        foreach (['*/dejavu/*Bold*.ttf', '*/liberation/*Bold*.ttf', '*/noto/*Bold*.ttf', '*/*Bold*.ttf'] as $pat) {
-            foreach (glob('/usr/share/fonts/' . $pat) ?: [] as $path) {
-                if (filesize($path) > 10_000 && $this->isTtfValid($path)) return $path;
-            }
-        }
-
         return null;
     }
 
     /**
      * Comprueba que el archivo es un TTF/OTF real leyendo su magic number.
-     * Evita pasar archivos corruptos o truncados a imagettftext.
      */
     private function isTtfValid(string $path): bool
     {
