@@ -8,10 +8,15 @@ $isMatricula = ($delivery['type'] === 'matricula');
 <section class="delivery-page">
   <div class="container">
 
-    <nav class="breadcrumb" aria-label="Ruta" style="margin-bottom:var(--space-5);font-size:var(--text-sm);color:var(--color-text-muted)">
-      <a href="<?= BASE_URL ?>/dashboard">Dashboard</a>
-      <span aria-hidden="true"> / </span>
-      <span><?= htmlspecialchars($delivery['title']) ?></span>
+    <nav class="breadcrumb-nav" aria-label="Ruta">
+      <a href="<?= BASE_URL ?>/dashboard" class="breadcrumb-link">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z"/><path d="M6 15V9h4v6"/></svg>
+        Dashboard
+      </a>
+      <span class="breadcrumb-sep" aria-hidden="true">&#8250;</span>
+      <a href="<?= BASE_URL ?>/dashboard" class="breadcrumb-link">Mis Entregas</a>
+      <span class="breadcrumb-sep" aria-hidden="true">&#8250;</span>
+      <span class="breadcrumb-current"><?= htmlspecialchars($delivery['title']) ?></span>
     </nav>
 
     <?php if ($flash = getFlash()): ?>
