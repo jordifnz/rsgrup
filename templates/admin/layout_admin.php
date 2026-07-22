@@ -6,13 +6,8 @@ $metaTitle  = $metaTitle  ?? 'Admin';
 $robots     = $robots     ?? 'noindex,nofollow';
 $currentUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-$accentColor = '#e87722';
-try {
-  $accentRow = Database::fetchOne(
-    "SELECT `value` FROM rsgrup_settings WHERE `key`='brand_accent_color' LIMIT 1"
-  );
-  if ($accentRow && !empty($accentRow['value'])) $accentColor = $accentRow['value'];
-} catch(\Throwable $e) {}
+// Usar Database::getSetting() que ya tiene try/catch interno
+$accentColor = Database::getSetting('brand_accent_color', '#e87722');
 ?>
 <!DOCTYPE html>
 <html lang="es" data-theme="dark">

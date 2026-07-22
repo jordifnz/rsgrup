@@ -3,13 +3,8 @@ $metaTitle = 'Entregas';
 include BASE_PATH . '/templates/admin/layout_admin.php';
 ?>
 
-<?php
-// URLs y token CSRF para JS — se inyectan antes de cualquier botón
-$csrfToken  = Csrf::token();
-$baseUrl    = BASE_URL;
-?>
+<?php $csrfToken = Csrf::generate(); $baseUrl = BASE_URL; ?>
 <script>
-/* ---- Entregas: funciones globales ---- */
 window.openDeliveryModal = function(d) {
   var m = document.getElementById('delivery-modal');
   if (!m) return;
@@ -46,7 +41,7 @@ window.loadEnrolled = function(deliveryId) {
         html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td>';
         html += '<td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
         html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\u00bfDar de baja?\')">'
-              + '<input type="hidden" name="_csrf" value="<?= $csrfToken ?>">'
+              + '<input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">'
               + '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
       });
       html += '</tbody></table>';
