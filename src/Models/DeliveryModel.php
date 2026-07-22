@@ -142,32 +142,39 @@ class DeliveryModel
      * Un alumno ha completado todo cuando está inscrito activamente en todas
      * las entregas activas y ha aprobado al menos un examen de cada tema
      * con exam_id en esas entregas.
+     *
+     * Protegido con try/catch: si rsgrup_topics aún no existe en la BD
+     * devuelve false en lugar de lanzar un error fatal.
      */
     public static function hasCompletedAll(int $userId): bool
     {
-        // Temas con examen de entregas activas donde el usuario está inscrito
-        $totalTopicsWithExam = (int) Database::fetchColumn(
-            'SELECT COUNT(t.id)
-             FROM rsgrup_topics t
-             JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1
-             JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
-             WHERE t.exam_id IS NOT NULL AND t.active = 1',
-            [$userId]
-        );
-        if ($totalTopicsWithExam === 0) return false;
+        try {
+            $totalTopicsWithExam = (int) Database::fetchColumn(
+                'SELECT COUNT(t.id)
+                 FROM rsgrup_topics t
+                 JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1
+                 JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
+                 WHERE t.exam_id IS NOT NULL AND t.active = 1',
+                [$userId]
+            );
+            if ($totalTopicsWithExam === 0) return false;
 
-        $passedTopics = (int) Database::fetchColumn(
-            'SELECT COUNT(DISTINCT t.id)
-             FROM rsgrup_topics t
-             JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1
-             JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
-             JOIN rsgrup_exam_attempts ea ON ea.exam_id = t.exam_id AND ea.user_id = ?
-             WHERE t.exam_id IS NOT NULL AND t.active = 1
-               AND ea.score >= (SELECT CAST(COALESCE(s.value, "60") AS DECIMAL(5,2))
-                                FROM rsgrup_settings s WHERE s.`key`="passing_score" LIMIT 1)',
-            [$userId, $userId]
-        );
+            $passedTopics = (int) Database::fetchColumn(
+                'SELECT COUNT(DISTINCT t.id)
+                 FROM rsgrup_topics t
+                 JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1
+                 JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
+                 JOIN rsgrup_exam_attempts ea ON ea.exam_id = t.exam_id AND ea.user_id = ?
+                 WHERE t.exam_id IS NOT NULL AND t.active = 1
+                   AND ea.score >= (SELECT CAST(COALESCE(s.value, "60") AS DECIMAL(5,2))
+                                    FROM rsgrup_settings s WHERE s.`key`="passing_score" LIMIT 1)',
+                [$userId, $userId]
+            );
 
-        return $passedTopics >= $totalTopicsWithExam;
+            return $passedTopics >= $totalTopicsWithExam;
+        } catch (\Throwable $e) {
+            error_log('[RSGrup] hasCompletedAll error: ' . $e->getMessage());
+            return false;
+        }
     }
 }
