@@ -5,6 +5,27 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 $deliveryFilter = (int)($_GET['delivery_id'] ?? 0);
 ?>
 
+<style>
+#filter-delivery {
+  background-color: var(--color-surface, #1c1b19);
+  color: var(--color-text, #f0ede8);
+  border: 1px solid var(--color-border, #3a3836);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  min-width: 180px;
+}
+#filter-delivery:focus {
+  outline: 2px solid var(--color-brand, #e87722);
+  outline-offset: 2px;
+}
+#filter-delivery option {
+  background-color: var(--color-surface, #1c1b19);
+  color: var(--color-text, #f0ede8);
+}
+</style>
+
 <script>
 window.openTopicModal = function(t) {
   var m = document.getElementById('topic-modal');
