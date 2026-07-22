@@ -57,17 +57,16 @@ $pages    = $total > 0 ? (int)ceil($total / $perPage) : 1;
         <div class="delivery-list">
 
           <!-- Cabecera de tabla -->
-          <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr auto;gap:var(--space-2);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);border-bottom:1px solid var(--color-divider)">
+          <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr;gap:var(--space-2);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);border-bottom:1px solid var(--color-divider)">
             <span></span>
             <span>Alumno</span>
             <span>Email</span>
             <span>Fecha matrícula</span>
-            <span>Nota</span>
           </div>
 
           <?php foreach ($rows as $row): ?>
           <?php $bulkKey = (int)$row['user_id'] . '_' . (int)$row['course_id']; ?>
-          <div class="delivery-row enrolled" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr auto;gap:var(--space-2);align-items:center">
+          <div class="delivery-row enrolled" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr;gap:var(--space-2);align-items:center">
             <div>
               <input type="checkbox" name="bulk_keys[]" value="<?= htmlspecialchars($bulkKey) ?>"
                      class="bulk-check" style="width:16px;height:16px;cursor:pointer;accent-color:var(--color-primary)">
@@ -80,18 +79,6 @@ $pages    = $total > 0 ? (int)ceil($total / $perPage) : 1;
             </div>
             <div style="font-size:var(--text-xs);color:var(--color-text-muted)">
               <?= htmlspecialchars($row['enrolled_at']) ?>
-            </div>
-            <div style="font-size:var(--text-xs);white-space:nowrap">
-              <?php if ($row['score'] !== null): ?>
-                <span class="badge badge-score"><?= number_format((float)$row['score'] / 10, 1) ?> / 10</span>
-                <?php if ((float)$row['score'] >= $passingScore): ?>
-                  <span class="badge badge-success">Aprobado</span>
-                <?php else: ?>
-                  <span class="badge" style="background:rgba(161,44,123,.1);color:#a12c7b;border-color:rgba(161,44,123,.2)">Suspenso</span>
-                <?php endif; ?>
-              <?php else: ?>
-                <span class="badge badge-muted">Sin nota</span>
-              <?php endif; ?>
             </div>
           </div>
           <?php endforeach; ?>
