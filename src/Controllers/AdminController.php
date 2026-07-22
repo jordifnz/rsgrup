@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ──────────────────────────────────────────────
+    // ── Dashboard ──────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ────────────────────────────────────────────
+    // ── Courses ───────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,7 +53,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ──────────────────────────────────────────
+    // ── Deliveries ────────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -175,7 +175,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────
+    // ── Exams ──────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -239,7 +239,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ──────────────────────────────────────────────
+    // ── Users ──────────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -330,7 +330,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ──────────────────────────────────────────
+    // ── Activity ────────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -340,7 +340,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ──────────────────────────────────────────
+    // ── Settings ────────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -369,57 +369,78 @@ class AdminController
         }
         foreach (['brand_accent_color', 'cert_name_color'] as $colorKey) {
             if (!empty($_POST[$colorKey])) {
-                $c = ltrim($_POST[$colorKey], '#');
-                if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) $_POST[$colorKey] = '#' . strtolower($c);
+                $v = ltrim($_POST[$colorKey], '#');
+                if (preg_match('/^[0-9a-fA-F]{6}$/', $v)) {
+                    $_POST[$colorKey] = '#' . $v;
+                } else {
+                    unset($_POST[$colorKey]);
+                }
             }
         }
-        if (!empty($_POST['brand_accent_color_hex'])) {
-            $c = ltrim($_POST['brand_accent_color_hex'], '#');
-            if (preg_match('/^[0-9a-fA-F]{6}$/', $c)) $_POST['brand_accent_color'] = '#' . strtolower($c);
-        }
+
+        // Normalizar exam_schedule
+        $examSchedule = in_array($_POST['exam_schedule'] ?? '', ['last_saturday','always','custom_days'])
+            ? $_POST['exam_schedule']
+            : 'last_saturday';
+        $_POST['exam_schedule'] = $examSchedule;
+
+        // Normalizar exam_custom_days (array de ints 0-6 -> cadena CSV)
+        $rawDays = isset($_POST['exam_custom_days']) && is_array($_POST['exam_custom_days'])
+            ? $_POST['exam_custom_days']
+            : [];
+        $validDays = array_values(array_unique(
+            array_filter(array_map('intval', $rawDays), fn($d) => $d >= 0 && $d <= 6)
+        ));
+        sort($validDays);
+        $_POST['exam_custom_days'] = implode(',', $validDays);
+
         $allowed = [
             'brand_accent_color',
             'paypal_client_id', 'paypal_client_secret', 'paypal_mode',
             'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from_name', 'smtp_from_email',
             'evolution_api_url', 'evolution_api_token', 'evolution_instance',
-            'whatsapp_support_number',
+            'whatsapp_support_number', 'whatsapp_template',
             'email_template_subject', 'email_template_body',
-            'whatsapp_template',
             'cert_bg_path', 'cert_name_x', 'cert_name_y', 'cert_name_fontsize', 'cert_name_color',
+            'exam_schedule', 'exam_custom_days',
         ];
         foreach ($allowed as $key) {
-            if (isset($_POST[$key])) {
-                $value = ($key === 'email_template_body')
-                    ? Sanitize::html($_POST[$key])
-                    : Sanitize::string($_POST[$key], 2000);
-                Database::execute(
-                    'INSERT INTO rsgrup_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
-                    [$key, $value]
-                );
-            }
+            if (!isset($_POST[$key])) continue;
+            $value = $_POST[$key];
+            Database::execute(
+                'INSERT INTO rsgrup_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
+                [$key, $value]
+            );
         }
-        ActivityLogger::log($_SESSION['user_id'], 'settings_saved', 'Ajustes actualizados');
+        ActivityLogger::log($_SESSION['user_id'], 'settings_saved', 'Ajustes guardados');
         $_SESSION['flash_success'] = 'Ajustes guardados correctamente.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    public function createApiToken(array $params = []): void
+    // ── API Tokens ──────────────────────────────────────────────
+    public function createToken(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
         $label = Sanitize::string($_POST['label'] ?? 'Token');
         $token = bin2hex(random_bytes(32));
-        Database::execute('INSERT INTO rsgrup_api_tokens (label,token,created_at) VALUES (?,?,NOW())', [$label, $token]);
-        ActivityLogger::log($_SESSION['user_id'], 'api_token_created', "Token: {$label}");
+        Database::execute(
+            'INSERT INTO rsgrup_api_tokens (label, token, created_at) VALUES (?, ?, NOW())',
+            [$label, $token]
+        );
+        ActivityLogger::log($_SESSION['user_id'], 'token_created', "Token: {$label}");
+        $_SESSION['flash_success'] = 'Token generado: ' . $token . ' — Cópialo ahora, no se mostrará de nuevo.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    public function deleteApiToken(array $params = []): void
+    public function deleteToken(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
         $id = Sanitize::int($params['id'] ?? 0);
         Database::execute('DELETE FROM rsgrup_api_tokens WHERE id=?', [$id]);
+        ActivityLogger::log($_SESSION['user_id'], 'token_deleted', "Token ID: {$id}");
+        $_SESSION['flash_success'] = 'Token eliminado.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 }

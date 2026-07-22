@@ -23,6 +23,8 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   color:var(--color-text-muted); display:flex; align-items:center;
 }
 .pwd-eye:hover { color:var(--color-text); }
+.day-checkboxes { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.5rem; }
+.day-checkboxes label { display:flex; align-items:center; gap:.35rem; font-size:.9rem; cursor:pointer; }
 </style>
 
 <form method="POST" action="<?= BASE_URL ?>/admin/settings/guardar" enctype="multipart/form-data" id="form-settings">
@@ -49,6 +51,58 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
         </div>
       </div>
     </div>
+  </div>
+</details>
+
+<!-- EXÁMENES -->
+<details class="settings-section">
+  <summary>📝 Exámenes</summary>
+  <div class="settings-body">
+    <p style="font-size:.875rem;color:var(--color-text-muted);margin-bottom:1rem">
+      Controla en qué momentos pueden los alumnos acceder a los exámenes.
+    </p>
+    <?php $examSchedule = $s['exam_schedule'] ?? 'last_saturday'; ?>
+    <div class="form-group">
+      <label>Modo de disponibilidad</label>
+      <select name="exam_schedule" id="exam-schedule-select">
+        <option value="last_saturday" <?= $examSchedule === 'last_saturday' ? 'selected' : '' ?>>Solamente el último sábado de cada mes</option>
+        <option value="always"        <?= $examSchedule === 'always'        ? 'selected' : '' ?>>Siempre disponible</option>
+        <option value="custom_days"   <?= $examSchedule === 'custom_days'   ? 'selected' : '' ?>>Días personalizados de la semana</option>
+      </select>
+    </div>
+
+    <div class="form-group" id="exam-custom-days-wrap" style="display:<?= $examSchedule === 'custom_days' ? 'block' : 'none' ?>">
+      <label>Días en que los exámenes estarán disponibles</label>
+      <?php
+        $customDays = array_filter(array_map('intval', explode(',', $s['exam_custom_days'] ?? '')));
+        $dayNames   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      ?>
+      <div class="day-checkboxes">
+        <?php for ($d = 0; $d <= 6; $d++): ?>
+        <label>
+          <input type="checkbox" name="exam_custom_days[]" value="<?= $d ?>"
+                 <?= in_array($d, $customDays, true) ? 'checked' : '' ?>>
+          <?= $dayNames[$d] ?>
+        </label>
+        <?php endfor; ?>
+      </div>
+      <small style="color:var(--color-text-muted)">Selecciona uno o más días.</small>
+    </div>
+
+    <?php
+      // Mostrar info de próxima fecha según modo actual
+      if ($examSchedule === 'last_saturday'):
+        $now = new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid'));
+        $month = (int)$now->format('n'); $year = (int)$now->format('Y');
+        $lastDay = (int)(new DateTimeImmutable("last day of {$year}-{$month}-01"))->format('j');
+        $ls = $lastDay;
+        while ((int)(new DateTimeImmutable("{$year}-{$month}-{$ls}"))->format('w') !== 6) $ls--;
+        $lsDate = (new DateTimeImmutable("{$year}-{$month}-{$ls}"))->format('d/m/Y');
+    ?>
+    <p style="margin-top:.75rem;font-size:.875rem;color:var(--color-text-muted)">
+      📅 El último sábado de este mes es: <strong><?= $lsDate ?></strong>
+    </p>
+    <?php endif; ?>
   </div>
 </details>
 
@@ -258,7 +312,7 @@ $varsList = '<code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}<
         <td>
           <form method="POST" action="<?= BASE_URL ?>/admin/settings/token/<?= (int)$t['id'] ?>/eliminar" style="display:inline">
             <?= \Csrf::field() ?>
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar token?')">Eliminar</button>
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('&iquest;Eliminar token?')">Eliminar</button>
           </form>
         </td>
       </tr>
@@ -280,7 +334,7 @@ $varsList = '<code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}<
 </details>
 
 <script>
-// ─ Ojos en campos password ────────────────────────────────────────
+// ─ Ojos en campos password ────────────────────────────────────────────────────
 document.querySelectorAll('.pwd-eye').forEach(function(btn) {
   btn.addEventListener('click', function() {
     var inp = document.getElementById(this.dataset.target);
@@ -297,7 +351,7 @@ function eyeClosed() {
   return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 }
 
-// ─ Colores ─────────────────────────────────────────────────────────────
+// ─ Colores ─────────────────────────────────────────────────────────────────────
 function syncColorPair(pickerId, hexId) {
   var picker = document.getElementById(pickerId);
   var hex    = document.getElementById(hexId);
@@ -317,7 +371,13 @@ document.getElementById('hex-cert-color')?.addEventListener('input', function() 
   if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById('pick-cert-color').value = v;
 });
 
-// ─ Preview de certificado ────────────────────────────────────────────
+// ─ Mostrar/ocultar días personalizados ───────────────────────────────────────
+document.getElementById('exam-schedule-select')?.addEventListener('change', function() {
+  var wrap = document.getElementById('exam-custom-days-wrap');
+  if (wrap) wrap.style.display = this.value === 'custom_days' ? 'block' : 'none';
+});
+
+// ─ Preview de certificado ──────────────────────────────────────────────────
 document.getElementById('cert-bg-input')?.addEventListener('change', function() {
   var file = this.files[0];
   if (!file) return;
