@@ -7,18 +7,22 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   <a href="<?= BASE_URL ?>/admin/examenes/nuevo" class="btn btn-primary">+ Nuevo examen</a>
 </div>
 <table class="data-table">
-  <thead><tr><th>ID</th><th>Título</th><th>Preguntas</th><th>Entrega vinculada</th><th>Acciones</th></tr></thead>
+  <thead>
+    <tr><th>ID</th><th>Título</th><th>Preguntas</th><th>Tema vinculado</th><th>Acciones</th></tr>
+  </thead>
   <tbody>
   <?php foreach ($exams as $e): ?>
   <tr>
     <td><?= $e['id'] ?></td>
     <td><?= htmlspecialchars($e['title']) ?></td>
     <td><?= (int)($e['question_count'] ?? 0) ?></td>
-    <td><?= htmlspecialchars($e['delivery_title'] ?? '—') ?></td>
+    <td><?= $e['topic_title'] ? htmlspecialchars($e['topic_title']) : '<em style="color:var(--color-text-muted)">Sin vincular</em>' ?></td>
     <td class="actions">
       <a href="<?= BASE_URL ?>/admin/examenes/<?= $e['id'] ?>/editar" class="btn btn-sm">Editar</a>
-      <form action="<?= BASE_URL ?>/admin/examenes/<?= $e['id'] ?>/eliminar" method="POST" style="display:inline" onsubmit="return confirm('¿Eliminar?')">
-        <?= Csrf::field() ?><button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+      <form action="<?= BASE_URL ?>/admin/examenes/<?= $e['id'] ?>/eliminar" method="POST"
+            style="display:inline" onsubmit="return confirm('¿Eliminar?')">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
       </form>
     </td>
   </tr>

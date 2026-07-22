@@ -1,117 +1,259 @@
 <?php
-// Called by AdminController::examEditor
 requireAdmin();
-$metaTitle  = ($exam ?? null) ? 'Editar exámen' : 'Nuevo exámen';
+$metaTitle  = ($exam ?? null) ? 'Editar examen' : 'Nuevo examen';
 $examData   = ($exam ?? null) ? $exam : [];
 $questions  = $examData['questions'] ?? [];
-$topicsList = $topics ?? [];
-$currentTopicId = null;
-if ($examData) {
-    $linkedTopic = Database::fetch('SELECT id FROM rsgrup_topics WHERE exam_id=?', [$examData['id']]);
-    $currentTopicId = $linkedTopic['id'] ?? null;
-}
+$topics     = $topics ?? [];
 ?>
 <?php include BASE_PATH . '/templates/admin/layout_admin.php'; ?>
 
-<div class="admin-page-header">
-  <div class="admin-page-header-left">
-    <h1><?= $metaTitle ?></h1>
-  </div>
-  <a href="<?= BASE_URL ?>/admin/examenes" class="btn-admin-secondary">← Volver</a>
+<style>
+.answer-row input[type="text"] {
+  color: var(--color-text, #f0f0f0);
+  background: var(--color-input-bg, var(--color-surface));
+}
+</style>
+
+<div class="section-header">
+  <h1><?= ($exam ?? null) ? 'Editar examen' : 'Nuevo examen' ?></h1>
+  <a href="<?= BASE_URL ?>/admin/examenes" class="btn">&larr; Volver</a>
 </div>
 
-<form method="post" action="<?= BASE_URL ?>/admin/examenes/guardar" id="examForm">
-  <?= csrfField() ?>
-  <input type="hidden" name="id" value="<?= (int)($examData['id'] ?? 0) ?>">
+<form id="exam-builder-form"
+      action="<?= BASE_URL ?>/admin/examenes/guardar"
+      method="POST">
 
-  <div class="admin-card">
-    <div class="form-row">
-      <label>Título del exámen</label>
-      <input type="text" name="title" required value="<?= htmlspecialchars($examData['title'] ?? '') ?>">
+  <?= Csrf::field() ?>
+  <?php if (!empty($examData['id'])): ?>
+    <input type="hidden" name="id" value="<?= (int)$examData['id'] ?>">
+  <?php endif; ?>
+
+  <div class="form-grid" style="margin-bottom:var(--space-6)">
+    <div class="form-group">
+      <label for="exam-title">T&iacute;tulo del examen *</label>
+      <input type="text" id="exam-title" name="title"
+             value="<?= htmlspecialchars($examData['title'] ?? '') ?>" required>
     </div>
-    <div class="form-row">
-      <label>Descripción</label>
-      <textarea name="description" rows="3"><?= htmlspecialchars($examData['description'] ?? '') ?></textarea>
-    </div>
-    <div class="form-row">
-      <label>Tema vinculado</label>
-      <select name="topic_id">
-        <option value="">-- Sin tema --</option>
-        <?php foreach ($topicsList as $t): ?>
-          <option value="<?= $t['id'] ?>" <?= $currentTopicId == $t['id'] ? 'selected' : '' ?>>
+    <div class="form-group">
+      <label for="exam-topic">Tema vinculado</label>
+      <select id="exam-topic" name="topic_id">
+        <option value="">&mdash; Sin vincular &mdash;</option>
+        <?php foreach ($topics as $t): ?>
+          <?php
+            // El examen está vinculado al tema que tenga este exam_id
+            $currentTopicId = null;
+            if (!empty($examData['id'])) {
+                $linked = TopicModel::findByExamId((int)$examData['id']);
+                $currentTopicId = $linked ? (int)$linked['id'] : null;
+            }
+          ?>
+          <option value="<?= $t['id'] ?>"
+            <?= ($currentTopicId === (int)$t['id']) ? 'selected' : '' ?>>
             <?= htmlspecialchars($t['title']) ?>
           </option>
         <?php endforeach; ?>
       </select>
-      <small class="help-text">El exámen quedará vinculado al tema seleccionado.</small>
+      <small style="color:var(--color-text-muted)">Seleccionar un tema vincula automáticamente este examen a él.</small>
+    </div>
+    <div class="form-group form-group--full">
+      <label for="exam-description">Descripci&oacute;n (opcional)</label>
+      <textarea id="exam-description" name="description" rows="3"
+                class="wysiwyg-exam"><?= htmlspecialchars($examData['description'] ?? '') ?></textarea>
     </div>
   </div>
 
-  <div class="admin-card" style="margin-top:var(--space-6)">
-    <h2>Preguntas</h2>
-    <div id="questions-container">
-      <?php foreach ($questions as $qi => $q): ?>
-        <?php include __DIR__ . '/_question_block.php'; ?>
-      <?php endforeach; ?>
-    </div>
-    <button type="button" class="btn-admin-secondary" onclick="addQuestion()">+ Añadir pregunta</button>
+  <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4)">
+    <h2 class="h3" style="margin:0">Preguntas</h2>
+    <button type="button" id="add-question-btn" class="btn btn-primary">+ A&ntilde;adir pregunta</button>
   </div>
 
-  <div class="form-actions">
-    <button type="submit" class="btn-admin-primary">Guardar exámen</button>
+  <div id="questions-container">
+    <?php foreach ($questions as $qi => $q): ?>
+    <div class="question-block" data-index="<?= $qi ?>"
+         style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-5);margin-bottom:var(--space-5);background:var(--color-surface)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+        <strong style="font-size:var(--text-sm)">Pregunta #<span class="q-num"><?= $qi + 1 ?></span></strong>
+        <button type="button" class="btn btn-sm btn-danger remove-question-btn">Eliminar pregunta</button>
+      </div>
+      <div class="form-group">
+        <label>Enunciado *</label>
+        <input type="text" name="questions[<?= $qi ?>][title]"
+               value="<?= htmlspecialchars($q['title'] ?? '') ?>" required placeholder="Texto de la pregunta">
+      </div>
+      <div class="form-group">
+        <label>Tipo de respuesta</label>
+        <select name="questions[<?= $qi ?>][answer_type]" class="answer-type-select">
+          <option value="radio"    <?= (($q['answer_type'] ?? 'radio') === 'radio')    ? 'selected' : '' ?>>Una respuesta (radio)</option>
+          <option value="checkbox" <?= (($q['answer_type'] ?? 'radio') === 'checkbox') ? 'selected' : '' ?>>M&uacute;ltiple (checkbox)</option>
+        </select>
+      </div>
+      <div class="answers-wrapper" style="margin-top:var(--space-3)">
+        <?php foreach (($q['answers'] ?? []) as $ai => $a): ?>
+        <div class="answer-row" style="display:flex;gap:var(--space-3);align-items:center;margin-bottom:var(--space-2)">
+          <input type="text" name="questions[<?= $qi ?>][answers][<?= $ai ?>][text]"
+                 value="<?= htmlspecialchars($a['text'] ?? '') ?>"
+                 placeholder="Texto de la respuesta" style="flex:1" required>
+          <label style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:var(--text-sm)">
+            <input type="checkbox" name="questions[<?= $qi ?>][answers][<?= $ai ?>][is_correct]" value="1"
+                   <?= !empty($a['is_correct']) ? 'checked' : '' ?>> Correcta
+          </label>
+          <button type="button" class="btn btn-sm remove-answer-btn">&times;</button>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <button type="button" class="btn btn-sm add-answer-btn" style="margin-top:var(--space-2)">+ A&ntilde;adir respuesta</button>
+    </div>
+    <?php endforeach; ?>
+  </div>
+
+  <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-6)">
+    <a href="<?= BASE_URL ?>/admin/examenes" class="btn">Cancelar</a>
+    <button type="submit" class="btn btn-primary">Guardar examen</button>
   </div>
 </form>
 
 <script>
-let qIdx = <?= count($questions) ?>;
+(function () {
+  'use strict';
+  var qCount = document.querySelectorAll('.question-block').length;
 
-function addQuestion() {
-  const container = document.getElementById('questions-container');
-  const i = qIdx++;
-  const block = document.createElement('div');
-  block.className = 'question-block';
-  block.innerHTML = `
-    <div class="question-header">
-      <span>Pregunta #${i+1}</span>
-      <button type="button" class="btn-admin-sm btn-admin-delete" onclick="this.closest('.question-block').remove()">× Eliminar</button>
-    </div>
-    <div class="form-row">
-      <label>Enunciado</label>
-      <textarea name="questions[${i}][text]" required rows="2"></textarea>
-    </div>
-    <div class="form-row">
-      <label>Tipo</label>
-      <select name="questions[${i}][type]" onchange="toggleOptions(this,${i})">
-        <option value="single">Una respuesta</option>
-        <option value="multiple">Múltiple respuesta</option>
-        <option value="text">Respuesta libre</option>
-      </select>
-    </div>
-    <div class="options-container" id="opts_${i}">
-      ${optionHtml(i, 0)}
-      ${optionHtml(i, 1)}
-    </div>
-    <button type="button" class="btn-admin-sm" onclick="addOption(${i})">+ Opción</button>
-  `;
-  container.appendChild(block);
-}
+  function questionHTML(qi) {
+    return [
+      '<div class="question-block" data-index="' + qi + '" style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-5);margin-bottom:var(--space-5);background:var(--color-surface)">',
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">',
+          '<strong style="font-size:var(--text-sm)">Pregunta #<span class="q-num">' + (qi + 1) + '</span></strong>',
+          '<button type="button" class="btn btn-sm btn-danger remove-question-btn">Eliminar pregunta</button>',
+        '</div>',
+        '<div class="form-group">',
+          '<label>Enunciado *</label>',
+          '<input type="text" name="questions[' + qi + '][title]" required placeholder="Texto de la pregunta">',
+        '</div>',
+        '<div class="form-group">',
+          '<label>Tipo de respuesta</label>',
+          '<select name="questions[' + qi + '][answer_type]" class="answer-type-select">',
+            '<option value="radio">Una respuesta (radio)</option>',
+            '<option value="checkbox">M&uacute;ltiple (checkbox)</option>',
+          '</select>',
+        '</div>',
+        '<div class="answers-wrapper" style="margin-top:var(--space-3)"></div>',
+        '<button type="button" class="btn btn-sm add-answer-btn" style="margin-top:var(--space-2)">+ A&ntilde;adir respuesta</button>',
+      '</div>'
+    ].join('');
+  }
 
-function optionHtml(qi, oi) {
-  return `<div class="option-row">
-    <input type="text" name="questions[${qi}][options][${oi}][text]" placeholder="Opción ${oi+1}">
-    <label><input type="checkbox" name="questions[${qi}][options][${oi}][correct]" value="1"> Correcta</label>
-    <button type="button" class="btn-icon" onclick="this.closest('.option-row').remove()">×</button>
-  </div>`;
-}
+  function answerHTML(qi, ai) {
+    return [
+      '<div class="answer-row" style="display:flex;gap:var(--space-3);align-items:center;margin-bottom:var(--space-2)">',
+        '<input type="text" name="questions[' + qi + '][answers][' + ai + '][text]"',
+               ' placeholder="Texto de la respuesta" style="flex:1;color:var(--color-text,#f0f0f0)" required>',
+        '<label style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:var(--text-sm)">',
+          '<input type="checkbox" name="questions[' + qi + '][answers][' + ai + '][is_correct]" value="1"> Correcta',
+        '</label>',
+        '<button type="button" class="btn btn-sm remove-answer-btn">&times;</button>',
+      '</div>'
+    ].join('');
+  }
 
-let optCounters = {};
-function addOption(qi) {
-  optCounters[qi] = (optCounters[qi] ?? 2) + 1;
-  document.getElementById('opts_' + qi).insertAdjacentHTML('beforeend', optionHtml(qi, optCounters[qi]));
-}
+  function renumberQuestions() {
+    document.querySelectorAll('#questions-container .question-block').forEach(function (block, idx) {
+      var numEl = block.querySelector('.q-num');
+      if (numEl) numEl.textContent = idx + 1;
+    });
+  }
 
-function toggleOptions(sel, qi) {
-  const container = document.getElementById('opts_' + qi);
-  container.style.display = sel.value === 'text' ? 'none' : '';
-}
+  document.getElementById('add-question-btn').addEventListener('click', function () {
+    var container = document.getElementById('questions-container');
+    var div = document.createElement('div');
+    div.innerHTML = questionHTML(qCount);
+    container.appendChild(div.firstElementChild);
+    var newBlock = container.lastElementChild;
+    var wrapper  = newBlock.querySelector('.answers-wrapper');
+    addAnswerToWrapper(wrapper, qCount, 0);
+    addAnswerToWrapper(wrapper, qCount, 1);
+    qCount++;
+    renumberQuestions();
+  });
+
+  document.getElementById('questions-container').addEventListener('click', function (e) {
+    if (e.target.classList.contains('remove-question-btn')) {
+      var block = e.target.closest('.question-block');
+      if (block) {
+        if (document.querySelectorAll('.question-block').length === 1) {
+          alert('El examen debe tener al menos una pregunta.');
+          return;
+        }
+        block.remove();
+        renumberQuestions();
+      }
+      return;
+    }
+    if (e.target.classList.contains('add-answer-btn')) {
+      var block   = e.target.closest('.question-block');
+      var qi      = parseInt(block.dataset.index, 10);
+      var wrapper = block.querySelector('.answers-wrapper');
+      var ai      = wrapper.querySelectorAll('.answer-row').length;
+      addAnswerToWrapper(wrapper, qi, ai);
+      return;
+    }
+    if (e.target.classList.contains('remove-answer-btn')) {
+      var wrapper = e.target.closest('.answers-wrapper');
+      if (wrapper && wrapper.querySelectorAll('.answer-row').length <= 1) {
+        alert('Debe haber al menos una respuesta.');
+        return;
+      }
+      var row = e.target.closest('.answer-row');
+      if (row) row.remove();
+      return;
+    }
+  });
+
+  function addAnswerToWrapper(wrapper, qi, ai) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = answerHTML(qi, ai);
+    wrapper.appendChild(tmp.firstElementChild);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof tinymce !== 'undefined') {
+      var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      tinymce.init({
+        selector    : '#exam-description',
+        language    : 'es',
+        language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@23.10.9/langs6/es.js',
+        plugins     : 'lists link code',
+        toolbar     : 'undo redo | formatselect | bold italic | bullist numlist | link | code',
+        menubar     : false,
+        branding    : false,
+        promotion   : false,
+        height      : 200,
+        skin        : isDark ? 'oxide-dark' : 'oxide',
+        content_css : isDark ? 'dark'       : 'default'
+      });
+    }
+  });
+
+  document.getElementById('exam-builder-form').addEventListener('submit', function (e) {
+    var blocks = document.querySelectorAll('#questions-container .question-block');
+    if (blocks.length === 0) {
+      e.preventDefault();
+      alert('Añade al menos una pregunta antes de guardar.');
+      return;
+    }
+    var ok = true;
+    blocks.forEach(function (block) {
+      if (block.querySelectorAll('.answer-row').length === 0) ok = false;
+    });
+    if (!ok) {
+      e.preventDefault();
+      alert('Cada pregunta debe tener al menos una respuesta.');
+      return;
+    }
+    if (window.tinymce) {
+      var ed = tinymce.get('exam-description');
+      if (ed) ed.save();
+    }
+  });
+})();
 </script>
+
+<?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>

@@ -1,152 +1,166 @@
 <?php
-// AdminController::deliveries
-requireAdmin();
 $metaTitle = 'Entregas';
+include BASE_PATH . '/templates/admin/layout_admin.php';
 ?>
-<?php include BASE_PATH . '/templates/admin/layout_admin.php'; ?>
-
-<div class="admin-page-header">
-  <div class="admin-page-header-left">
-    <h1>Entregas</h1>
-    <p>Una Entrega es el nivel al que se inscriben los alumnos. Contiene uno o varios Temas.</p>
-  </div>
-  <button class="btn-admin-primary" onclick="openModal('modalCreateDelivery')">+ Nueva entrega</button>
+<div class="section-header">
+  <h1>Gestión de Entregas</h1>
+  <button class="btn btn-primary" onclick="openDeliveryModal(null)">+ Nueva entrega</button>
 </div>
 
-<?php if (!empty($_SESSION['flash_success'])): ?>
-  <div class="alert-admin alert-success"><?= htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
-<?php endif; ?>
-
-<div class="admin-table-wrap">
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Ord.</th>
-        <th>Curso</th>
-        <th>Título</th>
-        <th>Tipo</th>
-        <th>Precio</th>
-        <th>Temas</th>
-        <th>Inscritos</th>
-        <th>Activo</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-    <?php foreach ($deliveries as $d): ?>
-      <tr>
-        <td><?= $d['id'] ?></td>
-        <td><?= $d['sort_order'] ?></td>
-        <td><?= htmlspecialchars($d['course_title'] ?? '') ?></td>
-        <td><?= htmlspecialchars($d['title']) ?></td>
-        <td><span class="badge badge-type-<?= $d['type'] ?>"><?= $d['type'] ?></span></td>
-        <td><?= number_format((float)$d['price'], 2, ',', '.') ?> €</td>
-        <td><?= $d['topic_count'] ?></td>
-        <td>
-          <button class="btn-admin-sm btn-admin-edit"
-            onclick="loadEnrolled(<?= $d['id'] ?>, '<?= htmlspecialchars(addslashes($d['title'])) ?>')"
-            title="Ver inscritos">
-            <?= $d['enrolled_count'] ?> 👥
-          </button>
-        </td>
-        <td><?= $d['active'] ? '<span class="badge badge-success">Sí</span>' : '<span class="badge badge-error">No</span>' ?></td>
-        <td class="td-actions">
-          <button class="btn-admin-sm btn-admin-edit"
-            onclick="openEditDelivery(<?= htmlspecialchars(json_encode($d)) ?>)">✏️ Editar</button>
-          <form method="post" action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/borrar"
-                style="display:inline" onsubmit="return confirm('Borrar entrega?')">
-            <?= csrfField() ?>
-            <button class="btn-admin-sm btn-admin-delete" type="submit">🗑 Borrar</button>
-          </form>
-        </td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-</div>
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Orden</th><th>Título</th><th>Curso</th><th>Tipo</th>
+      <th>Temas</th><th>Inscritos</th><th>Precio</th><th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+  <?php foreach ($deliveries as $d): ?>
+  <tr>
+    <td><?= (int)$d['sort_order'] ?></td>
+    <td><?= htmlspecialchars($d['title']) ?></td>
+    <td><?= htmlspecialchars($d['course_title'] ?? '—') ?></td>
+    <td><span class="badge"><?= htmlspecialchars($d['type']) ?></span></td>
+    <td>
+      <?= (int)($d['topic_count'] ?? 0) ?>
+      <a href="<?= BASE_URL ?>/admin/temas?delivery_id=<?= $d['id'] ?>" class="btn btn-sm" style="margin-left:4px">Temas</a>
+    </td>
+    <td>
+      <?= (int)($d['enrolled_count'] ?? 0) ?>
+      <button type="button" class="btn btn-sm" onclick="loadEnrolled(<?= $d['id'] ?>)">Ver</button>
+    </td>
+    <td><?= number_format((float)$d['price'], 2) ?> €</td>
+    <td class="actions">
+      <button type="button" class="btn btn-sm" onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">Editar</button>
+      <form action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/eliminar" method="POST"
+            style="display:inline" onsubmit="return confirm('¿Eliminar entrega?')">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+      </form>
+    </td>
+  </tr>
+  <?php endforeach; ?>
+  </tbody>
+</table>
 
 <!-- Modal inscritos -->
-<div id="modalEnrolled" class="modal-admin" style="display:none">
-  <div class="modal-admin-box">
-    <h2 id="enrolledTitle">Inscritos</h2>
-    <div id="enrolledContent"><p>Cargando…</p></div>
-    <div class="modal-admin-actions">
-      <button type="button" class="btn-admin-secondary" onclick="closeModal('modalEnrolled')">Cerrar</button>
+<div id="enrolled-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title">Alumnos inscritos</h2>
+      <button type="button" class="modal-close" onclick="document.getElementById('enrolled-modal').style.display='none'">&times;</button>
     </div>
+    <div id="enrolled-list"></div>
   </div>
 </div>
 
-<!-- Modal crear entrega -->
-<div id="modalCreateDelivery" class="modal-admin" role="dialog" aria-modal="true" style="display:none">
-  <div class="modal-admin-box">
-    <h2>Nueva Entrega</h2>
-    <form method="post" action="<?= BASE_URL ?>/admin/entregas/guardar">
-      <?= csrfField() ?>
-      <input type="hidden" name="id" value="0">
-      <?php include __DIR__ . '/_delivery_form_fields.php'; ?>
-      <div class="modal-admin-actions">
-        <button type="submit" class="btn-admin-primary">Guardar</button>
-        <button type="button" class="btn-admin-secondary" onclick="closeModal('modalCreateDelivery')">Cancelar</button>
+<!-- Modal entrega -->
+<div id="delivery-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="delivery-modal-title">Nueva Entrega</h2>
+      <button type="button" class="modal-close" onclick="document.getElementById('delivery-modal').style.display='none'">&times;</button>
+    </div>
+    <form action="<?= BASE_URL ?>/admin/entregas/guardar" method="POST" id="delivery-form">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="id" id="d-id" value="">
+      <div class="form-grid">
+        <div class="form-group form-group--full">
+          <label>Título *</label>
+          <input type="text" name="title" id="d-title" required>
+        </div>
+        <div class="form-group">
+          <label>Curso</label>
+          <select name="course_id" id="d-course">
+            <option value="">-- Sin curso --</option>
+            <?php foreach ($courses as $c): ?>
+              <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['title']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select name="type" id="d-type">
+            <option value="entrega">Entrega</option>
+            <option value="matricula">Matrícula</option>
+            <option value="practica">Práctica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Precio (€)</label>
+          <input type="number" name="price" id="d-price" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Pago</label>
+          <select name="payment_type" id="d-payment">
+            <option value="online">Online (PayPal)</option>
+            <option value="presencial">Presencial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Orden</label>
+          <input type="number" name="sort_order" id="d-order" value="0">
+        </div>
+        <div class="form-group form-group--full">
+          <label>Descripción</label>
+          <textarea name="description" id="d-desc" rows="4"></textarea>
+        </div>
+        <div class="form-group" style="display:flex;gap:var(--space-4)">
+          <label><input type="checkbox" name="notify_email"    id="d-notify-email">    Email al inscribir</label>
+          <label><input type="checkbox" name="notify_whatsapp" id="d-notify-wa">       WhatsApp al inscribir</label>
+          <label><input type="checkbox" name="active"          id="d-active" checked>   Activa</label>
+        </div>
       </div>
-    </form>
-  </div>
-</div>
-
-<!-- Modal editar entrega -->
-<div id="modalEditDelivery" class="modal-admin" role="dialog" aria-modal="true" style="display:none">
-  <div class="modal-admin-box">
-    <h2>Editar Entrega</h2>
-    <form method="post" action="<?= BASE_URL ?>/admin/entregas/guardar" id="formEditDelivery">
-      <?= csrfField() ?>
-      <input type="hidden" name="id" id="edit_delivery_id">
-      <?php include __DIR__ . '/_delivery_form_fields.php'; ?>
-      <div class="modal-admin-actions">
-        <button type="submit" class="btn-admin-primary">Guardar</button>
-        <button type="button" class="btn-admin-secondary" onclick="closeModal('modalEditDelivery')">Cancelar</button>
+      <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-6)">
+        <button type="button" class="btn" onclick="document.getElementById('delivery-modal').style.display='none'">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
-const ALL_TOPICS = <?= json_encode(array_map(fn($t) => ['id'=>$t['id'],'title'=>$t['title'],'course_id'=>$t['course_id']], $topics)) ?>;
-
-function openEditDelivery(d) {
-  const f = document.getElementById('formEditDelivery');
-  f.querySelector('[name=id]').value           = d.id;
-  f.querySelector('[name=course_id]').value    = d.course_id;
-  f.querySelector('[name=title]').value        = d.title;
-  f.querySelector('[name=description]').value  = d.description || '';
-  f.querySelector('[name=type]').value         = d.type;
-  f.querySelector('[name=price]').value        = d.price;
-  f.querySelector('[name=payment_type]').value = d.payment_type;
-  f.querySelector('[name=sort_order]').value   = d.sort_order;
-  f.querySelector('[name=notify_email]').checked    = d.notify_email == 1;
-  f.querySelector('[name=notify_whatsapp]').checked = d.notify_whatsapp == 1;
-  f.querySelector('[name=active]').checked     = d.active == 1;
-  // Temas: desmarcar todos y luego marcar los de esta entrega
-  // (los IDs vinculados los cargamos por AJAX o los pasamos en PHP)
-  openModal('modalEditDelivery');
+function openDeliveryModal(d) {
+  var m = document.getElementById('delivery-modal');
+  document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
+  document.getElementById('d-id').value      = d ? d.id : '';
+  document.getElementById('d-title').value   = d ? d.title : '';
+  document.getElementById('d-desc').value    = d ? (d.description || '') : '';
+  document.getElementById('d-price').value   = d ? d.price : '0';
+  document.getElementById('d-order').value   = d ? d.sort_order : '0';
+  var courseEl = document.getElementById('d-course');
+  if (d && d.course_id) courseEl.value = d.course_id; else courseEl.value = '';
+  var typeEl = document.getElementById('d-type');
+  if (d && d.type) typeEl.value = d.type;
+  var payEl = document.getElementById('d-payment');
+  if (d && d.payment_type) payEl.value = d.payment_type;
+  document.getElementById('d-notify-email').checked = d ? d.notify_email == 1 : false;
+  document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
+  document.getElementById('d-active').checked       = d ? d.active == 1 : true;
+  m.style.display = 'flex';
 }
 
-function loadEnrolled(deliveryId, title) {
-  document.getElementById('enrolledTitle').textContent = 'Inscritos en: ' + title;
-  document.getElementById('enrolledContent').innerHTML = '<p>Cargando…</p>';
-  openModal('modalEnrolled');
+function loadEnrolled(deliveryId) {
+  document.getElementById('enrolled-modal').style.display = 'flex';
+  document.getElementById('enrolled-list').innerHTML = '<p style="padding:var(--space-4)">Cargando…</p>';
   fetch('<?= BASE_URL ?>/admin/entregas/' + deliveryId + '/inscritos')
     .then(r => r.json())
     .then(rows => {
-      if (!rows.length) { document.getElementById('enrolledContent').innerHTML = '<p>Ningún inscrito.</p>'; return; }
-      let html = '<table class="admin-table"><thead><tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Inscrito</th><th></th></tr></thead><tbody>';
-      rows.forEach(r => {
-        html += `<tr><td>${r.name} ${r.surnames}</td><td>${r.email}</td><td>${r.status}</td><td>${r.enrolled_at}</td>
-          <td><form method="post" action="<?= BASE_URL ?>/admin/entregas/${deliveryId}/baja/${r.enrollment_id}" onsubmit="return confirm('Dar de baja?')">
-            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
-            <button class="btn-admin-sm btn-admin-delete">Baja</button></form></td></tr>`;
+      if (!rows.length) {
+        document.getElementById('enrolled-list').innerHTML = '<p style="padding:var(--space-4)">Sin inscritos.</p>';
+        return;
+      }
+      var html = '<table class="data-table"><thead><tr><th>Alumno</th><th>Email</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td><td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
+        html += '<td><form method="POST" action="<?= BASE_URL ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\\u00bfDar de baja?\')">';
+        html += '<input type="hidden" name="_csrf" value="<?= Csrf::token() ?>">';
+        html += '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
       });
       html += '</tbody></table>';
-      document.getElementById('enrolledContent').innerHTML = html;
+      document.getElementById('enrolled-list').innerHTML = html;
     });
 }
 </script>
+
+<?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
