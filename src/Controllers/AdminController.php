@@ -209,6 +209,12 @@ class AdminController
             error_log('[RSGrup] topics query error: ' . $e->getMessage());
             $topics = [];
         }
+        // Añadir adjuntos a cada tema
+        foreach ($topics as &$t) {
+            $t['_attachments'] = TopicModel::attachmentsForTopic((int)$t['id']);
+        }
+        unset($t);
+
         $deliveries = Database::fetchAll('SELECT id, title FROM rsgrup_deliveries ORDER BY sort_order');
         try {
             $exams = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
@@ -234,6 +240,22 @@ class AdminController
         return $filename;
     }
 
+    private function attachmentFilename(string $originalName, string $dir): string
+    {
+        $ext  = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        $base = pathinfo($originalName, PATHINFO_FILENAME);
+        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $base);
+        $base = preg_replace('/\s+/', '_', trim($base));
+        $base = preg_replace('/[^A-Za-z0-9_\-]/', '', $base);
+        $base = trim($base, '_-') ?: 'adjunto';
+        $filename = $base . '.' . $ext;
+        if (!file_exists($dir . '/' . $filename)) return $filename;
+        $i = 2;
+        do { $filename = $base . '_' . $i . '.' . $ext; $i++; }
+        while (file_exists($dir . '/' . $filename));
+        return $filename;
+    }
+
     public function saveTopic(array $params = []): void
     {
         $this->boot();
@@ -246,6 +268,7 @@ class AdminController
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
         $active      = isset($_POST['active']) ? 1 : 0;
 
+        // ── PDF principal ────────────────────────────────────────────
         $pdfFile = $id ? (Database::fetchColumn('SELECT pdf_file FROM rsgrup_topics WHERE id=?', [$id]) ?: null) : null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
@@ -258,6 +281,7 @@ class AdminController
             }
         }
 
+        // ── Guardar/actualizar tema ──────────────────────────────────
         if ($id) {
             TopicModel::update($id, [
                 'delivery_id'  => $deliveryId,
@@ -269,7 +293,7 @@ class AdminController
                 'active'       => $active,
             ]);
         } else {
-            TopicModel::create([
+            $id = TopicModel::create([
                 'delivery_id'  => $deliveryId,
                 'exam_id'      => $examId,
                 'title'        => $title,
@@ -279,7 +303,72 @@ class AdminController
                 'active'       => $active,
             ]);
         }
+
+        // ── Adjuntos adicionales: borrar los marcados ─────────────────
+        $toDelete = isset($_POST['delete_attachment']) && is_array($_POST['delete_attachment'])
+            ? array_map('intval', $_POST['delete_attachment']) : [];
+        foreach ($toDelete as $attId) {
+            if ($attId <= 0) continue;
+            $att = Database::fetch('SELECT * FROM rsgrup_topic_attachments WHERE id=? AND topic_id=?', [$attId, $id]);
+            if ($att) {
+                $path = BASE_PATH . '/private_files/attachments/' . $att['filename'];
+                if (file_exists($path)) @unlink($path);
+                Database::execute('DELETE FROM rsgrup_topic_attachments WHERE id=?', [$attId]);
+            }
+        }
+
+        // ── Adjuntos adicionales: subir nuevos ────────────────────────
+        if (!empty($_FILES['attachments']['tmp_name'])) {
+            $attDir = BASE_PATH . '/private_files/attachments';
+            if (!is_dir($attDir)) mkdir($attDir, 0755, true);
+
+            $files       = $_FILES['attachments'];
+            $descs       = isset($_POST['attachment_desc']) && is_array($_POST['attachment_desc'])
+                            ? $_POST['attachment_desc'] : [];
+            $count       = is_array($files['tmp_name']) ? count($files['tmp_name']) : 1;
+
+            for ($i = 0; $i < $count; $i++) {
+                $tmpName  = is_array($files['tmp_name'])  ? $files['tmp_name'][$i]  : $files['tmp_name'];
+                $origName = is_array($files['name'])      ? $files['name'][$i]      : $files['name'];
+                $error    = is_array($files['error'])     ? $files['error'][$i]     : $files['error'];
+                if ($error !== UPLOAD_ERR_OK || empty($tmpName)) continue;
+
+                // Tipos permitidos
+                $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                $allowed = ['pdf','doc','docx','xls','xlsx','ppt','pptx','zip','rar','jpg','jpeg','png','gif','mp4','mp3'];
+                if (!in_array($ext, $allowed)) continue;
+
+                $filename = $this->attachmentFilename($origName, $attDir);
+                move_uploaded_file($tmpName, $attDir . '/' . $filename);
+
+                $desc = Sanitize::string($descs[$i] ?? '', 500);
+                Database::execute(
+                    'INSERT INTO rsgrup_topic_attachments (topic_id, filename, original_name, description, sort_order, created_at)
+                     VALUES (?,?,?,?,?,NOW())',
+                    [$id, $filename, $origName, $desc ?: null, $i]
+                );
+            }
+        }
+
         ActivityLogger::log($_SESSION['user_id'], 'topic_saved', "Tema: {$title}");
+        header('Location: ' . BASE_URL . '/admin/temas');
+        exit;
+    }
+
+    /** Eliminar un adjunto individual vía AJAX o redirect */
+    public function deleteTopicAttachment(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+        $attId   = Sanitize::int($params['att_id'] ?? 0);
+        $topicId = Sanitize::int($params['topic_id'] ?? 0);
+        $att = Database::fetch('SELECT * FROM rsgrup_topic_attachments WHERE id=? AND topic_id=?', [$attId, $topicId]);
+        if ($att) {
+            $path = BASE_PATH . '/private_files/attachments/' . $att['filename'];
+            if (file_exists($path)) @unlink($path);
+            Database::execute('DELETE FROM rsgrup_topic_attachments WHERE id=?', [$attId]);
+        }
+        ActivityLogger::log($_SESSION['user_id'], 'attachment_deleted', "Adjunto ID: {$attId}");
         header('Location: ' . BASE_URL . '/admin/temas');
         exit;
     }

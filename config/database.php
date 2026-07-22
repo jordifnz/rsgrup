@@ -30,10 +30,6 @@ class Database
         return self::$instance;
     }
 
-    /**
-     * Crea las tablas imprescindibles si no existen todavía.
-     * Usa IF NOT EXISTS → idempotente, seguro ejecutar en cada arranque.
-     */
     private static function runMigrations(PDO $pdo): void
     {
         $statements = [
@@ -70,6 +66,19 @@ class Database
               PRIMARY KEY (`id`),
               KEY `idx_attempts_user_exam` (`user_id`, `exam_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+            // Tabla de adjuntos adicionales por tema
+            "CREATE TABLE IF NOT EXISTS `rsgrup_topic_attachments` (
+              `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              `topic_id`    INT UNSIGNED NOT NULL,
+              `filename`    VARCHAR(255) NOT NULL,
+              `original_name` VARCHAR(255) NOT NULL DEFAULT '',
+              `description` VARCHAR(500)          DEFAULT NULL,
+              `sort_order`  SMALLINT     NOT NULL DEFAULT 0,
+              `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`),
+              KEY `idx_attachments_topic` (`topic_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
 
         foreach ($statements as $sql) {
@@ -90,43 +99,36 @@ class Database
         return $stmt;
     }
 
-    /** Todas las filas como array asociativo. */
     public static function fetchAll(string $sql, array $params = []): array
     {
         return self::query($sql, $params)->fetchAll();
     }
 
-    /** Primera fila o false. */
     public static function fetchOne(string $sql, array $params = []): array|false
     {
         return self::query($sql, $params)->fetch();
     }
 
-    /** Alias de fetchOne() — compatibilidad con código legacy. */
     public static function fetchRow(string $sql, array $params = []): array|false
     {
         return self::fetchOne($sql, $params);
     }
 
-    /** Alias de fetchOne() — compatibilidad con modelos. */
     public static function fetch(string $sql, array $params = []): array|false
     {
         return self::fetchOne($sql, $params);
     }
 
-    /** Ejecuta INSERT / UPDATE / DELETE. Devuelve rowCount. */
     public static function execute(string $sql, array $params = []): int
     {
         return self::query($sql, $params)->rowCount();
     }
 
-    /** Valor de la primera columna de la primera fila (p.ej. COUNT). */
     public static function fetchColumn(string $sql, array $params = []): mixed
     {
         return self::query($sql, $params)->fetchColumn();
     }
 
-    /** Último ID insertado. */
     public static function lastInsertId(): string
     {
         return self::getInstance()->lastInsertId();

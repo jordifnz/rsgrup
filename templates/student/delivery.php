@@ -5,6 +5,9 @@ include BASE_PATH . '/templates/layouts/base.php';
 
 $isMatricula  = ($delivery['type'] === 'matricula');
 $passingScore = ExamModel::passingScore();
+
+// Cargar adjuntos adicionales de todos los temas de esta entrega
+$attachmentsByTopic = TopicModel::attachmentsForDelivery((int)$delivery['id']);
 ?>
 <section class="delivery-page">
   <div class="container">
@@ -84,6 +87,7 @@ $passingScore = ExamModel::passingScore();
             $lastPassed  = $attempt && ExamModel::isPassing((float)$attempt['score']);
             $lastFailed  = $attempt && !ExamModel::isPassing((float)$attempt['score']);
             $exhausted   = $aCnt >= 2;
+            $topicAttachments = $attachmentsByTopic[$topicId] ?? [];
           ?>
           <div class="delivery-row enrolled" style="flex-wrap:wrap;border-bottom:1px solid var(--color-divider);padding-bottom:var(--space-3);margin-bottom:var(--space-1)">
 
@@ -99,14 +103,31 @@ $passingScore = ExamModel::passingScore();
             </div>
             <?php endif; ?>
 
-            <!-- Acciones: PDF y Examen -->
-            <div style="width:100%;margin-left:var(--space-6);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center">
+            <!-- Acciones: PDF, Adjuntos y Examen -->
+            <div style="width:100%;margin-left:var(--space-6);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-start">
 
-              <!-- PDF del tema -->
+              <!-- PDF principal del tema -->
               <?php if (!empty($topic['pdf_file'])): ?>
               <a href="<?= BASE_URL ?>/descargar-pdf/topic/<?= $topicId ?>" class="btn btn-sm btn-secondary">
                 <i data-lucide="file-text"></i> Descargar PDF
               </a>
+              <?php endif; ?>
+
+              <!-- Adjuntos adicionales -->
+              <?php if (!empty($topicAttachments)): ?>
+              <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+                <?php foreach ($topicAttachments as $att): ?>
+                <a href="<?= BASE_URL ?>/descargar-adjunto/<?= (int)$att['id'] ?>" class="btn btn-sm btn-secondary"
+                   style="display:inline-flex;align-items:center;gap:var(--space-1)">
+                  <i data-lucide="paperclip" style="width:13px;height:13px"></i>
+                  <?php
+                    $ext = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
+                    $label = $att['description'] ?: $att['original_name'];
+                  ?>
+                  <?= htmlspecialchars($label) ?>
+                </a>
+                <?php endforeach; ?>
+              </div>
               <?php endif; ?>
 
               <!-- Examen del tema -->

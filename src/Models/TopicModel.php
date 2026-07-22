@@ -75,22 +75,21 @@ class TopicModel
 
     public static function delete(int $id): void
     {
+        // Borrar también los adjuntos del tema
+        $attachments = self::attachmentsForTopic($id);
+        foreach ($attachments as $att) {
+            $path = BASE_PATH . '/private_files/attachments/' . $att['filename'];
+            if (file_exists($path)) @unlink($path);
+        }
+        Database::execute('DELETE FROM rsgrup_topic_attachments WHERE topic_id=?', [$id]);
         Database::execute('DELETE FROM rsgrup_topics WHERE id=?', [$id]);
     }
 
-    /**
-     * Devuelve el tema que tiene asociado el examen dado.
-     * Usado por EnrollmentController::submitExam para mantener compatibilidad.
-     */
     public static function findByExamId(int $examId): ?array
     {
         return Database::fetch('SELECT * FROM rsgrup_topics WHERE exam_id=?', [$examId]) ?: null;
     }
 
-    /**
-     * Para cada tema de una entrega, devuelve el último attempt del usuario.
-     * Retorna un mapa [topic_id => attempt_row].
-     */
     public static function attemptsForDelivery(int $userId, int $deliveryId): array
     {
         $rows = Database::fetchAll(
@@ -104,8 +103,42 @@ class TopicModel
         );
         $map = [];
         foreach ($rows as $r) {
-            $map[(int)$r['topic_id']] = $r; // queda el último (ORDER ASC)
+            $map[(int)$r['topic_id']] = $r;
         }
         return $map;
+    }
+
+    /** Adjuntos adicionales de un tema, ordenados por sort_order */
+    public static function attachmentsForTopic(int $topicId): array
+    {
+        try {
+            return Database::fetchAll(
+                'SELECT * FROM rsgrup_topic_attachments WHERE topic_id=? ORDER BY sort_order ASC, id ASC',
+                [$topicId]
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** Adjuntos de todos los temas de una entrega, indexados por topic_id */
+    public static function attachmentsForDelivery(int $deliveryId): array
+    {
+        try {
+            $rows = Database::fetchAll(
+                'SELECT ta.* FROM rsgrup_topic_attachments ta
+                 JOIN rsgrup_topics t ON t.id = ta.topic_id
+                 WHERE t.delivery_id = ?
+                 ORDER BY ta.topic_id ASC, ta.sort_order ASC, ta.id ASC',
+                [$deliveryId]
+            );
+            $map = [];
+            foreach ($rows as $r) {
+                $map[(int)$r['topic_id']][] = $r;
+            }
+            return $map;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 }
