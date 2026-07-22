@@ -5,9 +5,6 @@ include BASE_PATH . '/templates/layouts/base.php';
 
 $isMatricula  = ($delivery['type'] === 'matricula');
 $passingScore = ExamModel::passingScore();
-$lastPassed   = $attempt && ExamModel::isPassing((float)$attempt['score']);
-$lastFailed   = $attempt && !ExamModel::isPassing((float)$attempt['score']);
-$exhausted    = $attemptCount >= 2;
 ?>
 <section class="delivery-page">
   <div class="container">
@@ -69,30 +66,54 @@ $exhausted    = $attemptCount >= 2;
             </div>
           </div>
 
-        <?php else: ?>
-          <div class="delivery-list">
+        <?php elseif (empty($topics)): ?>
+          <p style="font-size:var(--text-sm);color:var(--color-text-muted);padding:var(--space-4) 0">
+            Esta entrega todavía no tiene temas asignados.
+          </p>
 
-            <!-- Fila PDF -->
-            <?php if (!empty($delivery['pdf_file'])): ?>
-            <div class="delivery-row enrolled">
-              <div class="delivery-info">
-                <i data-lucide="file-text" style="width:16px;height:16px"></i>
-                <span class="delivery-title">Temario en PDF</span>
-              </div>
-              <div class="delivery-actions">
-                <a href="<?= BASE_URL ?>/descargar-pdf/<?= (int)$enrollment['id'] ?>" class="btn btn-sm btn-primary">
-                  <i data-lucide="download"></i> Descargar
-                </a>
-              </div>
+        <?php else: ?>
+          <!-- Lista de temas -->
+          <div class="delivery-list">
+          <?php foreach ($topics as $topic):
+            $topicId     = (int)$topic['id'];
+            $attempt     = $topic['_attempt'];
+            $attemptsAll = $topic['_attempts_all'];
+            $aCnt        = $topic['_attempt_count'];
+            $canRetry    = $topic['_can_retry'];
+            $examObj     = $topic['_exam_obj'];
+            $lastPassed  = $attempt && ExamModel::isPassing((float)$attempt['score']);
+            $lastFailed  = $attempt && !ExamModel::isPassing((float)$attempt['score']);
+            $exhausted   = $aCnt >= 2;
+          ?>
+          <div class="delivery-row enrolled" style="flex-wrap:wrap;border-bottom:1px solid var(--color-divider);padding-bottom:var(--space-3);margin-bottom:var(--space-1)">
+
+            <!-- Encabezado del tema -->
+            <div class="delivery-info" style="width:100%;margin-bottom:var(--space-2)">
+              <i data-lucide="book-open" style="width:16px;height:16px;flex-shrink:0"></i>
+              <span class="delivery-title" style="font-weight:600"><?= htmlspecialchars($topic['title']) ?></span>
+            </div>
+
+            <?php if (!empty($topic['description'])): ?>
+            <div style="width:100%;margin-left:var(--space-6);margin-bottom:var(--space-2)">
+              <div class="richtext" style="font-size:var(--text-sm);color:var(--color-text-muted)"><?= $topic['description'] ?></div>
             </div>
             <?php endif; ?>
 
-            <!-- Fila Examen -->
-            <?php if ($delivery['exam_id'] && $exam): ?>
-            <div class="delivery-row enrolled" style="flex-wrap:wrap">
-              <div class="delivery-info">
-                <i data-lucide="file-check" style="width:16px;height:16px"></i>
-                <span class="delivery-title">Examen: <?= htmlspecialchars($exam['title']) ?></span>
+            <!-- Acciones: PDF y Examen -->
+            <div style="width:100%;margin-left:var(--space-6);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center">
+
+              <!-- PDF del tema -->
+              <?php if (!empty($topic['pdf_file'])): ?>
+              <a href="<?= BASE_URL ?>/descargar-pdf/topic/<?= $topicId ?>" class="btn btn-sm btn-secondary">
+                <i data-lucide="file-text"></i> Descargar PDF
+              </a>
+              <?php endif; ?>
+
+              <!-- Examen del tema -->
+              <?php if ($topic['exam_id'] && $examObj): ?>
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+                <i data-lucide="file-check" style="width:15px;height:15px"></i>
+                <span style="font-size:var(--text-sm)">Examen: <?= htmlspecialchars($examObj['title']) ?></span>
 
                 <?php if ($lastPassed): ?>
                   <span class="badge badge-score"><?= number_format((float)$attempt['score'] / 10, 1) ?> / 10</span>
@@ -110,105 +131,98 @@ $exhausted    = $attemptCount >= 2;
                 <?php else: ?>
                   <span class="badge badge-muted">Pendiente</span>
                 <?php endif; ?>
-              </div>
 
-              <div class="delivery-actions">
+                <!-- Botón para abrir/hacer examen -->
                 <?php if ($lastPassed): ?>
                   <span style="font-size:var(--text-xs);color:var(--color-text-muted)">Ya aprobado</span>
 
                 <?php elseif ($lastFailed && $exhausted): ?>
                   <span style="font-size:var(--text-xs);color:var(--color-text-muted)">Intentos agotados</span>
 
-                <?php elseif ($lastFailed && $canRetry): ?>
-                  <?php if (!$examAvailable['available']): ?>
-                    <span style="font-size:var(--text-xs);color:var(--color-text-muted)">
-                      Disponible el <?= htmlspecialchars($examAvailable['next'] ?? '...') ?>
-                    </span>
-                  <?php else: ?>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="toggleExamen()" id="btn-abrir-examen">
-                      <i data-lucide="pencil"></i> 2.&ordf; oportunidad
-                    </button>
-                  <?php endif; ?>
+                <?php elseif ((!$attempt || $canRetry) && $examAvailable['available']): ?>
+                  <button type="button" class="btn btn-sm btn-primary"
+                    onclick="toggleExamen(<?= $topicId ?>)"
+                    id="btn-abrir-examen-<?= $topicId ?>">
+                    <i data-lucide="pencil"></i>
+                    <?= ($canRetry ? '2.&ordf; oportunidad' : 'Realizar') ?>
+                  </button>
 
-                <?php elseif (!$attempt): ?>
-                  <?php if (!$examAvailable['available']): ?>
-                    <span style="font-size:var(--text-xs);color:var(--color-text-muted)">
-                      Disponible el <?= htmlspecialchars($examAvailable['next'] ?? '...') ?>
-                    </span>
-                  <?php else: ?>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="toggleExamen()" id="btn-abrir-examen">
-                      <i data-lucide="pencil"></i> Realizar
-                    </button>
-                  <?php endif; ?>
-                <?php endif; ?>
-              </div>
-
-              <!-- Formulario oculto (primer intento o segundo intento) -->
-              <?php if ((!$attempt && $examAvailable['available']) || ($lastFailed && $canRetry && $examAvailable['available'])): ?>
-              <div id="examen-form-wrap" style="display:none;width:100%;margin-top:var(--space-4);border-top:1px solid var(--color-divider);padding-top:var(--space-4)">
-                <?php if ($lastFailed && $canRetry): ?>
-                <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-3)">
-                  &#9888;&#65039; Esta es tu <strong>segunda y última oportunidad</strong>.
-                  Nota anterior: <strong><?= htmlspecialchars((string)$attempt['score']) ?>%</strong>.
-                </p>
-                <?php endif; ?>
-                <?php if (!empty($exam['questions'])): ?>
-                <form action="<?= BASE_URL ?>/examen/enviar" method="POST" class="exam-form">
-                  <?= Csrf::field() ?>
-                  <input type="hidden" name="exam_id" value="<?= (int)$exam['id'] ?>">
-                  <?php foreach ($exam['questions'] as $qi => $q): ?>
-                  <div style="margin-bottom:var(--space-5)">
-                    <p style="font-weight:500;font-size:var(--text-sm);margin-bottom:var(--space-2)">
-                      <strong><?= $qi + 1 ?>.</strong>
-                      <?= htmlspecialchars($q['title'] ?? $q['question_text'] ?? '') ?>
-                    </p>
-                    <?php if (!empty($q['question_desc'])): ?>
-                      <div class="richtext" style="margin-bottom:var(--space-2);font-size:var(--text-sm)"><?= $q['question_desc'] ?></div>
-                    <?php endif; ?>
-                    <div style="display:flex;flex-direction:column;gap:.35rem;margin-left:var(--space-4)">
-                      <?php foreach ($q['answers'] as $a): ?>
-                      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:var(--text-sm)">
-                        <input type="<?= $q['answer_type'] ?>"
-                               name="answers[<?= (int)$q['id'] ?>]<?= $q['answer_type'] === 'checkbox' ? '[]' : '' ?>"
-                               value="<?= (int)$a['id'] ?>">
-                        <?= htmlspecialchars($a['text'] ?? $a['answer_text'] ?? '') ?>
-                      </label>
-                      <?php endforeach; ?>
-                    </div>
-                  </div>
-                  <?php endforeach; ?>
-                  <div style="display:flex;gap:var(--space-3)">
-                    <button type="submit" class="btn btn-sm btn-primary">Enviar respuestas</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleExamen()">Cancelar</button>
-                  </div>
-                </form>
-                <?php else: ?>
-                  <p style="font-size:var(--text-sm);color:var(--color-text-muted)">El examen no tiene preguntas todavía.</p>
+                <?php elseif (!$examAvailable['available']): ?>
+                  <span style="font-size:var(--text-xs);color:var(--color-text-muted)">
+                    Disponible el <?= htmlspecialchars($examAvailable['next'] ?? '...') ?>
+                  </span>
                 <?php endif; ?>
               </div>
               <?php endif; ?>
 
-              <!-- Historial de intentos (solo si suspendido y agotado) -->
-              <?php if ($lastFailed && $exhausted && count($attempts) > 1): ?>
-              <div style="width:100%;margin-top:var(--space-3);border-top:1px solid var(--color-divider);padding-top:var(--space-3)">
-                <details style="font-size:var(--text-xs);color:var(--color-text-muted)">
-                  <summary style="cursor:pointer">Ver historial de intentos</summary>
-                  <ul style="margin-top:var(--space-2);padding-left:var(--space-4)">
-                    <?php foreach ($attempts as $i => $at): ?>
-                    <li>Intento <?= $i + 1 ?>: <strong><?= number_format((float)$at['score'] / 10, 1) ?> / 10</strong>
-                      &mdash; <?= htmlspecialchars((new DateTimeImmutable($at['created_at']))->format('d/m/Y H:i')) ?>
-                    </li>
+            </div><!-- /acciones -->
+
+            <!-- Formulario de examen inline (oculto) -->
+            <?php if ($topic['exam_id'] && $examObj && ((!$attempt && $examAvailable['available']) || ($canRetry && $examAvailable['available']))): ?>
+            <div id="examen-form-wrap-<?= $topicId ?>" style="display:none;width:100%;margin-top:var(--space-4);border-top:1px solid var(--color-divider);padding-top:var(--space-4)">
+              <?php if ($canRetry): ?>
+              <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-3)">
+                &#9888;&#65039; Esta es tu <strong>segunda y última oportunidad</strong>.
+                Nota anterior: <strong><?= htmlspecialchars((string)$attempt['score']) ?>%</strong>.
+              </p>
+              <?php endif; ?>
+              <?php if (!empty($examObj['questions'])): ?>
+              <form action="<?= BASE_URL ?>/examen/enviar" method="POST" class="exam-form">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="exam_id" value="<?= (int)$examObj['id'] ?>">
+                <?php foreach ($examObj['questions'] as $qi => $q): ?>
+                <div style="margin-bottom:var(--space-5)">
+                  <p style="font-weight:500;font-size:var(--text-sm);margin-bottom:var(--space-2)">
+                    <strong><?= $qi + 1 ?>.</strong>
+                    <?= htmlspecialchars($q['title'] ?? $q['question_text'] ?? '') ?>
+                  </p>
+                  <?php if (!empty($q['question_desc'])): ?>
+                    <div class="richtext" style="margin-bottom:var(--space-2);font-size:var(--text-sm)"><?= $q['question_desc'] ?></div>
+                  <?php endif; ?>
+                  <div style="display:flex;flex-direction:column;gap:.35rem;margin-left:var(--space-4)">
+                    <?php foreach ($q['answers'] as $a): ?>
+                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:var(--text-sm)">
+                      <input type="<?= $q['answer_type'] ?>"
+                             name="answers[<?= (int)$q['id'] ?>]<?= $q['answer_type'] === 'checkbox' ? '[]' : '' ?>"
+                             value="<?= (int)$a['id'] ?>">
+                      <?= htmlspecialchars($a['text'] ?? $a['answer_text'] ?? '') ?>
+                    </label>
                     <?php endforeach; ?>
-                  </ul>
-                </details>
-              </div>
+                  </div>
+                </div>
+                <?php endforeach; ?>
+                <div style="display:flex;gap:var(--space-3)">
+                  <button type="submit" class="btn btn-sm btn-primary">Enviar respuestas</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="toggleExamen(<?= $topicId ?>)">Cancelar</button>
+                </div>
+              </form>
+              <?php else: ?>
+                <p style="font-size:var(--text-sm);color:var(--color-text-muted)">El examen no tiene preguntas todavía.</p>
               <?php endif; ?>
-
             </div>
-            <?php endif; // exam ?>
+            <?php endif; ?>
 
-          </div>
-        <?php endif; // !isMatricula ?>
+            <!-- Historial de intentos (si suspendido y agotado y hay más de uno) -->
+            <?php if ($lastFailed && $exhausted && count($attemptsAll) > 1): ?>
+            <div style="width:100%;margin-top:var(--space-3);border-top:1px solid var(--color-divider);padding-top:var(--space-3)">
+              <details style="font-size:var(--text-xs);color:var(--color-text-muted)">
+                <summary style="cursor:pointer">Ver historial de intentos</summary>
+                <ul style="margin-top:var(--space-2);padding-left:var(--space-4)">
+                  <?php foreach ($attemptsAll as $i => $at): ?>
+                  <li>Intento <?= $i + 1 ?>: <strong><?= number_format((float)$at['score'] / 10, 1) ?> / 10</strong>
+                    &mdash; <?= htmlspecialchars((new DateTimeImmutable($at['created_at']))->format('d/m/Y H:i')) ?>
+                  </li>
+                  <?php endforeach; ?>
+                </ul>
+              </details>
+            </div>
+            <?php endif; ?>
+
+          </div><!-- /delivery-row topic -->
+          <?php endforeach; ?>
+          </div><!-- /delivery-list -->
+
+        <?php endif; // topics ?>
 
       <?php else: ?>
 
@@ -252,9 +266,9 @@ $exhausted    = $attemptCount >= 2;
 </section>
 
 <script>
-function toggleExamen() {
-  var wrap = document.getElementById('examen-form-wrap');
-  var btn  = document.getElementById('btn-abrir-examen');
+function toggleExamen(topicId) {
+  var wrap = document.getElementById('examen-form-wrap-' + topicId);
+  var btn  = document.getElementById('btn-abrir-examen-' + topicId);
   if (!wrap) return;
   var open = wrap.style.display !== 'none';
   wrap.style.display = open ? 'none' : 'block';

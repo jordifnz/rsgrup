@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    // ── Vista de una entrega ─────────────────────────────────────────────────────────
+    // ── Vista de una entrega ──────────────────────────────────────────────────────
     public function showDelivery(array $params = []): void
     {
         requireLogin();
@@ -21,33 +21,48 @@ class EnrollmentController
         $isEnrolled = ($enrollment && $enrollment['status'] === 'active');
 
         // Calcular si puede inscribirse (para el CTA)
-        $canEnroll  = false;
+        $canEnroll       = false;
         $canEnrollReason = '';
         if (!$isEnrolled) {
-            $check = DeliveryModel::canEnroll($userId, (int)$delivery['id']);
+            $check           = DeliveryModel::canEnroll($userId, (int)$delivery['id']);
             $canEnroll       = $check['ok'];
             $canEnrollReason = $check['reason'];
         }
 
-        // Examen y estado de intentos (solo si inscrito)
-        $exam          = null;
-        $attempt       = null;   // último intento
-        $attempts      = [];     // todos los intentos
-        $attemptCount  = 0;
-        $canRetry      = false;  // puede hacer un nuevo intento ahora
+        // Topics con sus exámenes e intentos del alumno
+        $topics        = [];
+        $topicAttempts = [];   // [topic_id => last_attempt_row]
         $examAvailable = ['available' => true, 'reason' => '', 'next' => null];
 
-        if ($isEnrolled && $delivery['exam_id']) {
-            $exam         = ExamModel::findWithQuestions((int)$delivery['exam_id']);
-            $attempt      = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
-            $attempts     = ExamModel::getAllAttempts($userId, (int)$delivery['exam_id']);
-            $attemptCount = count($attempts);
+        if ($isEnrolled) {
+            $topics        = TopicModel::findByDelivery((int)$delivery['id']);
+            $topicAttempts = TopicModel::attemptsForDelivery($userId, (int)$delivery['id']);
             $examAvailable = ExamModel::isAvailable();
 
-            // Puede reintentar si: suspendió el último intento Y tiene menos de 2 intentos
-            if ($attempt && !ExamModel::isPassing((float)$attempt['score']) && $attemptCount < 2) {
-                $canRetry = true;
+            // Enriquecer cada topic con datos de examen y estado
+            foreach ($topics as &$topic) {
+                $tid = (int)$topic['id'];
+                $topic['_attempt']      = $topicAttempts[$tid] ?? null;
+                $topic['_attempts_all'] = [];
+                $topic['_attempt_count'] = 0;
+                $topic['_can_retry']    = false;
+                $topic['_exam_obj']     = null;
+
+                if ($topic['exam_id']) {
+                    $topic['_exam_obj']      = ExamModel::findWithQuestions((int)$topic['exam_id']);
+                    $allAttempts             = ExamModel::getAllAttempts($userId, (int)$topic['exam_id']);
+                    $topic['_attempts_all']  = $allAttempts;
+                    $topic['_attempt_count'] = count($allAttempts);
+                    // Sobreescribir con el último intento real
+                    $topic['_attempt'] = $allAttempts ? end($allAttempts) : null;
+
+                    $lastAttempt = $topic['_attempt'];
+                    if ($lastAttempt && !ExamModel::isPassing((float)$lastAttempt['score']) && $topic['_attempt_count'] < 2) {
+                        $topic['_can_retry'] = true;
+                    }
+                }
             }
+            unset($topic);
         }
 
         $metaTitle = htmlspecialchars($delivery['title']);
@@ -55,7 +70,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/delivery.php';
     }
 
-    // ── Formulario de confirmación de inscripción ─────────────────────────────────────
+    // ── Formulario de confirmación de inscripción ─────────────────────────────────
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -68,8 +83,7 @@ class EnrollmentController
             return;
         }
 
-        $userId = $_SESSION['user_id'];
-
+        $userId     = $_SESSION['user_id'];
         $enrollment = DeliveryModel::getEnrollment($userId, $deliveryId);
         if ($enrollment && $enrollment['status'] === 'active') {
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
@@ -83,7 +97,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
-    // ── Iniciar inscripción / pago ──────────────────────────────────────────────
+    // ── Iniciar inscripción / pago ────────────────────────────────────────────────
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -130,7 +144,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: éxito ──────────────────────────────────────────────────
+    // ── Callback PayPal: éxito ────────────────────────────────────────────────────
     public function paypalSuccess(array $params = []): void
     {
         requireLogin();
@@ -170,7 +184,45 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga de PDF privado ──────────────────────────────────────────────────
+    // ── Descarga de PDF privado de un TOPIC ──────────────────────────────────────
+    public function downloadTopicPdf(array $params = []): void
+    {
+        requireLogin();
+        $topicId = Sanitize::int($params['id'] ?? 0);
+        $userId  = $_SESSION['user_id'];
+
+        $topic = TopicModel::findById($topicId);
+        if (!$topic || !$topic['active']) {
+            http_response_code(404);
+            echo 'Tema no encontrado.';
+            exit;
+        }
+
+        // Verificar que el alumno está inscrito en la entrega del topic
+        $enrollment = DeliveryModel::getEnrollment($userId, (int)$topic['delivery_id']);
+        if (!$enrollment || $enrollment['status'] !== 'active') {
+            http_response_code(403);
+            echo 'Acceso denegado.';
+            exit;
+        }
+
+        $pdfFile = $topic['pdf_file'] ?? '';
+        if (!$pdfFile) { echo 'PDF no disponible.'; exit; }
+
+        $file = BASE_PATH . '/private_files/' . $pdfFile;
+        if (!file_exists($file)) { echo 'Archivo no encontrado.'; exit; }
+
+        ActivityLogger::log($userId, 'pdf_download', 'Descarga PDF tema: ' . $topic['title']);
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . basename($file) . '"');
+        header('Content-Length: ' . filesize($file));
+        header('X-Accel-Buffering: no');
+        readfile($file);
+        exit;
+    }
+
+    // ── Descarga de PDF legacy (por enrollment_id) ────────────────────────────────
     public function downloadPdf(array $params = []): void
     {
         requireLogin();
@@ -201,7 +253,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga del título/certificado ───────────────────────────────────────────
+    // ── Descarga del título/certificado ──────────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
         requireLogin();
@@ -219,7 +271,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Envío de examen ───────────────────────────────────────────────────────
+    // ── Envío de examen ───────────────────────────────────────────────────────────
     public function submitExam(array $params = []): void
     {
         requireLogin();
@@ -232,8 +284,12 @@ class EnrollmentController
         $exam = ExamModel::findById($examId);
         if (!$exam) { http_response_code(404); exit; }
 
-        // La relación es delivery.exam_id → exams.id, no al revés.
-        $delivery = DeliveryModel::findByExamId($examId);
+        // Buscar el topic que tiene vinculado este examen
+        $topic = TopicModel::findByExamId($examId);
+        if (!$topic) { http_response_code(404); exit; }
+
+        // Buscar la entrega del topic
+        $delivery = DeliveryModel::findById((int)$topic['delivery_id']);
         if (!$delivery) { http_response_code(404); exit; }
 
         $enrollment = DeliveryModel::getEnrollment($userId, (int)$delivery['id']);
@@ -241,7 +297,7 @@ class EnrollmentController
             http_response_code(403); exit;
         }
 
-        // Verificar ventana de disponibilidad del examen
+        // Verificar ventana de disponibilidad
         $avail = ExamModel::isAvailable();
         if (!$avail['available']) {
             $_SESSION['flash_error'] = $avail['reason']
@@ -250,32 +306,27 @@ class EnrollmentController
             exit;
         }
 
-        // Verificar número de intentos y estado del último
+        // Verificar intentos
         $lastAttempt  = ExamModel::getLastAttempt($userId, $examId);
         $attemptCount = ExamModel::getAttemptCount($userId, $examId);
 
         if ($lastAttempt) {
-            $passed = ExamModel::isPassing((float)$lastAttempt['score']);
-
-            if ($passed) {
-                // Ya aprobó: no puede repetir
+            if (ExamModel::isPassing((float)$lastAttempt['score'])) {
                 $_SESSION['flash_error'] = 'Ya aprobaste este examen con un ' . $lastAttempt['score'] . '%. No es necesario repetirlo.';
                 header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
                 exit;
             }
-
             if ($attemptCount >= 2) {
-                // Ya usó los 2 intentos
                 $_SESSION['flash_error'] = 'Ya has agotado los 2 intentos permitidos para este examen.';
                 header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
                 exit;
             }
-            // Si llega aquí: suspendió y tiene menos de 2 intentos → se permite continuar
         }
 
         $score = ExamModel::evaluate($examId, $answers);
         ExamModel::saveAttempt($userId, $examId, (int)$enrollment['id'], $answers, $score);
-        ActivityLogger::log($userId, 'exam_submitted', "Examen '{$exam['title']}' - Intento #" . ($attemptCount + 1) . " - Nota: {$score}");
+        ActivityLogger::log($userId, 'exam_submitted',
+            "Examen '{$exam['title']}' - Intento #" . ($attemptCount + 1) . " - Nota: {$score}");
 
         $passing   = ExamModel::isPassing($score);
         $threshold = ExamModel::passingScore();

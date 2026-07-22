@@ -53,14 +53,15 @@ $router->get('/perfil',          [DashboardController::class, 'profile']);
 $router->post('/perfil/guardar', [DashboardController::class, 'updateProfile']);
 
 // Entregas e inscripciones
-$router->get('/entrega/{slug}',             [EnrollmentController::class, 'showDelivery']);
-$router->get('/inscribir/{id}',             [EnrollmentController::class, 'showEnroll']);
-$router->post('/inscribir',                 [EnrollmentController::class, 'initiate']);
-$router->get('/paypal/success',             [EnrollmentController::class, 'paypalSuccess']);
-$router->get('/paypal/cancel',              [EnrollmentController::class, 'paypalCancel']);
-$router->get('/descargar-pdf/{id}',         [EnrollmentController::class, 'downloadPdf']);
-$router->get('/descargar-titulo',           [EnrollmentController::class, 'downloadCertificate']);
-$router->post('/examen/enviar',             [EnrollmentController::class, 'submitExam']);
+$router->get('/entrega/{slug}',               [EnrollmentController::class, 'showDelivery']);
+$router->get('/inscribir/{id}',               [EnrollmentController::class, 'showEnroll']);
+$router->post('/inscribir',                   [EnrollmentController::class, 'initiate']);
+$router->get('/paypal/success',               [EnrollmentController::class, 'paypalSuccess']);
+$router->get('/paypal/cancel',                [EnrollmentController::class, 'paypalCancel']);
+$router->get('/descargar-pdf/topic/{id}',     [EnrollmentController::class, 'downloadTopicPdf']);
+$router->get('/descargar-pdf/{id}',           [EnrollmentController::class, 'downloadPdf']);
+$router->get('/descargar-titulo',             [EnrollmentController::class, 'downloadCertificate']);
+$router->post('/examen/enviar',               [EnrollmentController::class, 'submitExam']);
 
 // --- ADMIN ---
 $router->get('/admin',                                                [AdminController::class, 'dashboard']);
