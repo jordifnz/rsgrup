@@ -87,4 +87,8 @@ $router->post('/admin/settings/token/{id}/eliminar',                        [Adm
 $router->post('/admin/api-tokens/crear',                                    [AdminController::class, 'createApiToken']);
 $router->post('/admin/api-tokens/{id}/eliminar',                            [AdminController::class, 'deleteApiToken']);
 
+// --- IMPRESIÓN MASIVA DE TÍTULOS ---
+$router->get('/admin/titulos-masivos',           [AdminController::class, 'titlesBulk']);
+$router->post('/admin/titulos-masivos/generar',  [AdminController::class, 'titlesBulkGenerate']);
+
 $router->dispatch();
