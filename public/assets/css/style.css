@@ -31,6 +31,9 @@
   --shadow-sm:0 1px 2px rgba(0,0,0,.06);
   --shadow-md:0 4px 12px rgba(0,0,0,.1);
   --shadow-lg:0 12px 32px rgba(0,0,0,.15);
+
+  /* Content widths */
+  --content-wide: 1200px;
 }
 
 /* ── Light mode ───────────────────────────────────────────────── */
@@ -117,6 +120,7 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .btn-icon:hover{color:var(--color-text)}
 
 /* ── Admin layout ─────────────────────────────────────────────── */
+/* body.admin-layout es el flex container raíz */
 .admin-layout{display:flex;min-height:100dvh}
 
 /* Sidebar */
@@ -146,11 +150,18 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .sidebar-icon{width:16px;height:16px;flex-shrink:0}
 .sidebar-footer{padding:var(--space-4);border-top:1px solid rgba(255,255,255,.06)}
 
-/* Main
-   IMPORTANTE: overflow-x:clip en vez de overflow-x:hidden.
-   hidden crea un stacking context que rompe position:fixed en móvil.
-   clip recorta igual el scroll horizontal pero NO crea stacking context. */
-.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-x:clip}
+/* Wrapper principal (contiene topbar + main).
+   IMPORTANTE: overflow-x:clip en vez de hidden.
+   overflow-x:hidden crearía un nuevo containing block para position:fixed
+   en móvil, haciendo que el botón WA quede atrapado dentro del wrapper.
+   overflow-x:clip recorta igual el scroll horizontal sin ese efecto. */
+.admin-wrapper{
+  flex:1;display:flex;flex-direction:column;min-width:0;
+  overflow-x:clip;
+}
+/* .admin-main es el <main> dentro del wrapper */
+.admin-main{flex:1;display:flex;flex-direction:column;min-width:0}
+
 .admin-topbar{
   position:sticky;top:0;z-index:10;
   background:var(--color-surface);border-bottom:1px solid var(--color-divider);
@@ -160,7 +171,7 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 }
 .topbar-title{font-weight:600;font-size:var(--text-sm);color:var(--color-text-muted);flex:1;margin-left:var(--space-2)}
 .topbar-actions{display:flex;align-items:center;gap:var(--space-3);margin-left:auto}
-.topbar-user{font-size:var(--text-xs);color:var(--color-text-muted)}
+.topbar-user{font-size:var(--text-xs);color:var(--color-text-muted);display:flex;align-items:center;gap:var(--space-2)}
 .btn-back{
   display:inline-flex;align-items:center;gap:.3rem;
   font-size:var(--text-xs);color:var(--color-text-muted);
@@ -443,7 +454,7 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .delivery-actions{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0}
 .price-tag{font-size:var(--text-xs);color:var(--color-text-muted)}
 
-/* ── Breadcrumb (variante B3 — minimalista con icono + 3 niveles) ── */
+/* ── Breadcrumb ───────────────────────────────────────────────────── */
 .breadcrumb-nav{
   display:flex;align-items:center;gap:var(--space-2);
   flex-wrap:wrap;
@@ -470,7 +481,7 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
   color:var(--color-text);
 }
 
-/* ── Title CTA ────────────────────────────────────────────────── */
+/* ── Title CTA ───────────────────────────────────────────────���── */
 .title-cta{
   text-align:center;
   padding:var(--space-8) var(--space-4);
@@ -499,7 +510,9 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .empty-state p{max-width:36ch;margin-bottom:var(--space-6)}
 
 /* ── WhatsApp flotante ────────────────────────────────────────── */
-.wa-float{
+/* .wa-fab es la clase real del partial. .wa-float se mantiene como alias. */
+.wa-float,
+.wa-fab{
   position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
   width:52px;height:52px;border-radius:var(--radius-full);
   background:#25d366;color:#fff;
@@ -508,8 +521,8 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
   text-decoration:none !important;
   transition:transform var(--transition),box-shadow var(--transition);
 }
-.wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.4)}
-.wa-float svg{width:28px;height:28px}
+.wa-float:hover,.wa-fab:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.4)}
+.wa-float svg,.wa-fab svg{width:28px;height:28px}
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media(max-width:768px){
