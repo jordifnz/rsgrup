@@ -30,7 +30,7 @@
   --content-wide: 1200px;
 }
 
-/* ── Light mode ───────────────────���───────────────────────────── */
+/* ── Light mode ───────────────────────────────────────────────── */
 :root,[data-theme="light"] {
   --color-bg:#f7f6f2;--color-surface:#fff;--color-surface-2:#f4f4f0;
   --color-border:#e0ddd8;--color-divider:#e8e5e0;
@@ -41,6 +41,8 @@
   --color-sidebar-bg:#1c1b19;--color-sidebar-text:#cdccca;
   --color-sidebar-active:rgba(232,119,34,.15);
   --color-input-bg:#fff;
+  /* Fondo encabezado de tema — teal muy suave */
+  --color-topic-header: #d6eced;
 }
 
 /* ── Dark mode ────────────────────────────────────────────────── */
@@ -57,6 +59,8 @@
   --shadow-md:0 4px 12px rgba(0,0,0,.35);
   --shadow-lg:0 12px 32px rgba(0,0,0,.5);
   --color-input-bg:#222120;
+  /* Fondo encabezado de tema — teal oscuro suave */
+  --color-topic-header: #1e3235;
 }
 
 /* ── Reset base ───────────────────────────────────────────────── */
@@ -135,11 +139,9 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .sidebar-link:hover{background:rgba(255,255,255,.06);color:#fff}
 .sidebar-link.active{background:var(--color-sidebar-active);color:var(--color-brand);font-weight:600}
 .sidebar-icon{width:18px;height:18px;flex-shrink:0}
-/* icono Lucide dentro de sidebar-link */
 .sidebar-link > i,
 .sidebar-link [data-lucide] {
   width:18px;height:18px;flex-shrink:0;
-  /* evitar que el icono se encoja al colapsar */
   min-width:18px;
 }
 .sidebar-link span{transition:opacity var(--transition),width var(--transition)}
@@ -158,17 +160,14 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
     pointer-events:none;
   }
   .admin-sidebar .sidebar-link{
-    /* centrar el icono cuando no hay texto */
     justify-content:center;
     padding:var(--space-3);
     gap:0;
   }
   .admin-sidebar .sidebar-link span{
-    /* Ocultar texto pero mantener accesibilidad */
     width:0;opacity:0;overflow:hidden;
     display:inline-block;
   }
-  /* tooltip nativo con title para accesibilidad */
   .admin-sidebar .sidebar-link:hover::after{
     content: attr(data-tooltip);
     position:absolute;
@@ -343,6 +342,20 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .delivery-actions{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0}
 .price-tag{font-size:var(--text-xs);color:var(--color-text-muted)}
 
+/* ── Encabezado de tema (delivery.php) ────────────────────────── */
+.topic-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-topic-header);
+  border-bottom: 1px solid var(--color-border);
+}
+.topic-header span {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
 /* ── Breadcrumb ───────────────────────────────────────────────────── */
 .breadcrumb-nav{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-5)}
 .breadcrumb-link{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--text-xs);color:var(--color-text-muted);text-decoration:none !important;transition:color var(--transition)}
@@ -361,7 +374,7 @@ a:hover{color:var(--color-brand-hover);text-decoration:underline}
 .empty-state h3{color:var(--color-text);margin-bottom:var(--space-2)}
 .empty-state p{max-width:36ch;margin-bottom:var(--space-6)}
 
-/* ── WhatsApp flotante (fallback, las propiedades críticas van en el partial) ── */
+/* ── WhatsApp flotante ── */
 .wa-float,.wa-fab{
   position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;
   width:52px;height:52px;border-radius:var(--radius-full);
