@@ -240,6 +240,19 @@ $varsList = '<code>{{nombre}}</code> <code>{{apellidos}}</code> <code>{{email}}<
   <summary>🎓 Título de alumnos</summary>
   <div class="settings-body">
 
+    <!-- ACCESO RÁPIDO A IMPRESIÓN MASIVA -->
+    <div style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--color-surface-offset);border-radius:var(--radius-md);border:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div>
+        <p style="font-weight:600;margin-bottom:.2rem">🖨️ Impresión masiva de títulos</p>
+        <p style="font-size:.875rem;color:var(--color-text-muted);margin:0">
+          Selecciona alumnos y genera un PDF con todos sus títulos de una sola vez.
+        </p>
+      </div>
+      <a href="<?= BASE_URL ?>/admin/titulos-masivos" class="btn btn-primary" style="white-space:nowrap">
+        Ir a impresión masiva →
+      </a>
+    </div>
+
     <div class="form-group">
       <label>Imagen de fondo del título (PNG apaisado recomendado)</label>
       <input type="file" name="cert_bg" accept="image/png,image/jpeg" id="cert-bg-input">
