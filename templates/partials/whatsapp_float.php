@@ -20,7 +20,8 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  z-index: 900;
+  /* z-index alto para estar siempre por encima de cualquier layout */
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -80,8 +81,19 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
   60%       { transform: translateY(-.25rem); }
 }
 
-/* En móvil se mueve un poco más arriba para no tapar la nav inferior */
+/* En móvil sube un poco para no tapar la barra de navegación del SO */
 @media (max-width: 640px) {
-  .wa-fab { bottom: 5rem; right: 1rem; }
+  .wa-fab {
+    bottom: 1.25rem;
+    right: 1rem;
+    width: 3rem;
+    height: 3rem;
+  }
+  .wa-fab__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  /* El tooltip en móvil no tiene hover, lo ocultamos para no molestar */
+  .wa-fab__tooltip { display: none; }
 }
 </style>
