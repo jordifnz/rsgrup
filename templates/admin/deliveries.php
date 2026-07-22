@@ -68,7 +68,7 @@ window.loadEnrolled = function(deliveryId) {
       rows.forEach(function(r) {
         html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td>';
         html += '<td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
-        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\u00bfDar de baja?\')">'
+        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'¿Dar de baja?\')">'
               + '<input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">'
               + '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
       });
@@ -87,7 +87,9 @@ window.loadEnrolled = function(deliveryId) {
   <thead>
     <tr>
       <th>Orden</th><th>Título</th><th>Curso</th><th>Tipo</th>
-      <th>Temas</th><th>Inscritos</th><th>Precio</th><th>Acciones</th>
+      <th>Temas</th><th>Inscritos</th><th>Precio</th>
+      <th>Activa</th><th>WhatsApp</th><th>Email</th>
+      <th>Acciones</th>
     </tr>
   </thead>
   <tbody>
@@ -103,6 +105,9 @@ window.loadEnrolled = function(deliveryId) {
       <button type="button" class="btn btn-sm" onclick="loadEnrolled(<?= $d['id'] ?>)">Ver</button>
     </td>
     <td><?= number_format((float)$d['price'], 2) ?> €</td>
+    <td style="text-align:center"><?= $d['active']           ? '✅' : '❌' ?></td>
+    <td style="text-align:center"><?= $d['notify_whatsapp']  ? '✅' : '❌' ?></td>
+    <td style="text-align:center"><?= $d['notify_email']     ? '✅' : '❌' ?></td>
     <td class="actions">
       <button type="button" class="btn btn-sm" onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">Editar</button>
       <form action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/eliminar" method="POST"
@@ -157,6 +162,7 @@ window.loadEnrolled = function(deliveryId) {
             <option value="entrega">Entrega</option>
             <option value="matricula">Matrícula</option>
             <option value="practica">Práctica</option>
+            <option value="videollamada">Videollamada</option>
           </select>
         </div>
         <div class="form-group">
