@@ -83,32 +83,44 @@ class ExamModel
             return ['available' => true, 'reason' => '', 'next' => null];
         }
 
-        $now     = new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid'));
-        $today   = (int)$now->format('w'); // 0=dom, 6=sáb
-        $dayNum  = (int)$now->format('j');
-        $month   = (int)$now->format('n');
-        $year    = (int)$now->format('Y');
+        $now    = new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid'));
+        $today  = (int)$now->format('w'); // 0=dom, 6=sáb
+        $dayNum = (int)$now->format('j');
+        $month  = (int)$now->format('n');
+        $year   = (int)$now->format('Y');
 
         if ($schedule === 'last_saturday') {
-            // Último sábado del mes = último día del mes en que format('w')===6
-            $lastDay     = (int)(new DateTimeImmutable("last day of {$year}-{$month}-01"))->format('j');
-            $lastSatDay  = $lastDay;
+            // Calcular el último sábado del mes ACTUAL
+            $lastDay    = (int)(new DateTimeImmutable("last day of {$year}-{$month}-01"))->format('j');
+            $lastSatDay = $lastDay;
             while ((int)(new DateTimeImmutable("{$year}-{$month}-{$lastSatDay}"))->format('w') !== 6) {
                 $lastSatDay--;
             }
-            $available = ($dayNum === $lastSatDay);
-            if ($available) {
+
+            // ¿Hoy ES el último sábado?
+            if ($dayNum === $lastSatDay) {
                 return ['available' => true, 'reason' => '', 'next' => null];
             }
-            // Calcular próximo último sábado
-            $nextMonth  = $month === 12 ? 1  : $month + 1;
-            $nextYear   = $month === 12 ? $year + 1 : $year;
-            $nlastDay   = (int)(new DateTimeImmutable("last day of {$nextYear}-{$nextMonth}-01"))->format('j');
-            $nlastSat   = $nlastDay;
-            while ((int)(new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('w') !== 6) {
-                $nlastSat--;
+
+            // Calcular la próxima fecha:
+            // • Si el último sábado del mes actual AUN NO ha pasado (está en el futuro),
+            //   mostrar ese mismo mes.
+            // • Si ya pasó (dayNum > lastSatDay), saltar al siguiente mes.
+            if ($dayNum < $lastSatDay) {
+                // El último sábado del mes actual todavía no ha llegado
+                $nextDate = (new DateTimeImmutable("{$year}-{$month}-{$lastSatDay}"))->format('d/m/Y');
+            } else {
+                // Ya pasó: calcular el último sábado del mes siguiente
+                $nextMonth = $month === 12 ? 1       : $month + 1;
+                $nextYear  = $month === 12 ? $year + 1 : $year;
+                $nlastDay  = (int)(new DateTimeImmutable("last day of {$nextYear}-{$nextMonth}-01"))->format('j');
+                $nlastSat  = $nlastDay;
+                while ((int)(new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('w') !== 6) {
+                    $nlastSat--;
+                }
+                $nextDate = (new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('d/m/Y');
             }
-            $nextDate = (new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('d/m/Y');
+
             return [
                 'available' => false,
                 'reason'    => 'Los exámenes solo están disponibles el último sábado de cada mes.',
