@@ -2,13 +2,32 @@
 $metaTitle = 'Temas';
 include BASE_PATH . '/templates/admin/layout_admin.php';
 
-// Agrupar temas por entrega para facilitar la presentación
-$grouped = [];
-foreach ($topics as $t) {
-    $grouped[$t['delivery_id'] ?? 0][] = $t;
-}
 $deliveryFilter = (int)($_GET['delivery_id'] ?? 0);
 ?>
+
+<script>
+window.openTopicModal = function(t) {
+  var m = document.getElementById('topic-modal');
+  document.getElementById('topic-modal-title').textContent = t ? 'Editar Tema' : 'Nuevo Tema';
+  document.getElementById('t-id').value       = t ? t.id : '';
+  document.getElementById('t-title').value    = t ? t.title : '';
+  document.getElementById('t-desc').value     = t ? (t.description || '') : '';
+  document.getElementById('t-order').value    = t ? t.sort_order : '0';
+  document.getElementById('t-active').checked = t ? t.active == 1 : true;
+  var dEl = document.getElementById('t-delivery');
+  dEl.value = t ? (t.delivery_id || '') : '';
+  var eEl = document.getElementById('t-exam');
+  eEl.value = t ? (t.exam_id || '') : '';
+  var pdfInfo = document.getElementById('t-pdf-current');
+  if (t && t.pdf_file) {
+    pdfInfo.textContent = 'PDF actual: ' + t.pdf_file;
+    pdfInfo.style.display = 'block';
+  } else {
+    pdfInfo.style.display = 'none';
+  }
+  m.style.display = 'flex';
+};
+</script>
 
 <div class="section-header">
   <h1>Gestión de Temas</h1>
@@ -29,7 +48,6 @@ $deliveryFilter = (int)($_GET['delivery_id'] ?? 0);
 </form>
 
 <?php
-// Aplicar filtro
 $visibleTopics = $deliveryFilter
     ? array_filter($topics, fn($t) => (int)$t['delivery_id'] === $deliveryFilter)
     : $topics;
@@ -125,29 +143,5 @@ $visibleTopics = $deliveryFilter
     </form>
   </div>
 </div>
-
-<script>
-function openTopicModal(t) {
-  var m = document.getElementById('topic-modal');
-  document.getElementById('topic-modal-title').textContent = t ? 'Editar Tema' : 'Nuevo Tema';
-  document.getElementById('t-id').value       = t ? t.id : '';
-  document.getElementById('t-title').value    = t ? t.title : '';
-  document.getElementById('t-desc').value     = t ? (t.description || '') : '';
-  document.getElementById('t-order').value    = t ? t.sort_order : '0';
-  document.getElementById('t-active').checked = t ? t.active == 1 : true;
-  var dEl = document.getElementById('t-delivery');
-  dEl.value = t ? (t.delivery_id || '') : '';
-  var eEl = document.getElementById('t-exam');
-  eEl.value = t ? (t.exam_id || '') : '';
-  var pdfInfo = document.getElementById('t-pdf-current');
-  if (t && t.pdf_file) {
-    pdfInfo.textContent = 'PDF actual: ' + t.pdf_file;
-    pdfInfo.style.display = 'block';
-  } else {
-    pdfInfo.style.display = 'none';
-  }
-  m.style.display = 'flex';
-}
-</script>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>

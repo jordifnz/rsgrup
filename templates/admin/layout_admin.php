@@ -208,6 +208,7 @@ $accentColor = Database::getSetting('brand_accent_color', '#e87722');
         ['href'=>'/admin',           'label'=>'Dashboard',  'icon'=>'layout-dashboard'],
         ['href'=>'/admin/cursos',    'label'=>'Cursos',     'icon'=>'book-open'],
         ['href'=>'/admin/entregas',  'label'=>'Entregas',   'icon'=>'file-text'],
+        ['href'=>'/admin/temas',     'label'=>'Temas',      'icon'=>'layers'],
         ['href'=>'/admin/examenes',  'label'=>'Exámenes',   'icon'=>'check-square'],
         ['href'=>'/admin/usuarios',  'label'=>'Usuarios',   'icon'=>'users'],
         ['href'=>'/admin/actividad', 'label'=>'Actividad',  'icon'=>'activity'],

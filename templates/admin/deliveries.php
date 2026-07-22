@@ -69,10 +69,7 @@ window.loadEnrolled = function(deliveryId) {
     <td><?= htmlspecialchars($d['title']) ?></td>
     <td><?= htmlspecialchars($d['course_title'] ?? '—') ?></td>
     <td><span class="badge"><?= htmlspecialchars($d['type']) ?></span></td>
-    <td>
-      <?= (int)($d['topic_count'] ?? 0) ?>
-      <a href="<?= BASE_URL ?>/admin/temas?delivery_id=<?= $d['id'] ?>" class="btn btn-sm" style="margin-left:4px">Temas</a>
-    </td>
+    <td><?= (int)($d['topic_count'] ?? 0) ?></td>
     <td>
       <?= (int)($d['enrolled_count'] ?? 0) ?>
       <button type="button" class="btn btn-sm" onclick="loadEnrolled(<?= $d['id'] ?>)">Ver</button>
