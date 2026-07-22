@@ -18,111 +18,33 @@ $baseUrl   = BASE_URL;
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
   <style>
-    /* ── Sidebar colapsado (iconos solos) ───────────────────────── */
-    .admin-sidebar {
-      width: 220px;
-      transition: width 200ms ease;
-    }
-    .admin-sidebar.collapsed {
-      width: 54px;
-    }
-    /* Iconos: siempre visibles y de tamaño fijo */
-    .sidebar-link svg,
-    .sidebar-link i {
-      width: 18px;
-      height: 18px;
-      min-width: 18px;
-      flex-shrink: 0;
-    }
-    /* Texto: se oculta al colapsar */
-    .admin-sidebar.collapsed .sidebar-link span {
-      opacity: 0;
-      width: 0;
-      overflow: hidden;
-      display: inline-block;
-      transition: opacity 150ms ease, width 150ms ease;
-    }
-    .admin-sidebar:not(.collapsed) .sidebar-link span {
-      opacity: 1;
-      width: auto;
-      transition: opacity 200ms ease;
-    }
-    /* Centrar icono cuando está colapsado */
-    .admin-sidebar.collapsed .sidebar-link {
-      justify-content: center;
-      padding: 0.625rem;
-      gap: 0;
-    }
-    /* Logo: ocultar al colapsar */
-    .admin-sidebar.collapsed .sidebar-logo img {
-      opacity: 0;
-      pointer-events: none;
-    }
-    /* Tooltip al hover en modo colapsado */
-    .admin-sidebar.collapsed .sidebar-link {
-      position: relative;
-    }
+    .admin-sidebar { width:220px; transition:width 200ms ease; }
+    .admin-sidebar.collapsed { width:54px; }
+    .sidebar-link svg, .sidebar-link i { width:18px;height:18px;min-width:18px;flex-shrink:0; }
+    .admin-sidebar.collapsed .sidebar-link span { opacity:0;width:0;overflow:hidden;display:inline-block; }
+    .admin-sidebar:not(.collapsed) .sidebar-link span { opacity:1;width:auto; }
+    .admin-sidebar.collapsed .sidebar-link { justify-content:center;padding:.625rem;gap:0; }
+    .admin-sidebar.collapsed .sidebar-logo img { opacity:0;pointer-events:none; }
+    .admin-sidebar.collapsed .sidebar-link { position:relative; }
     .admin-sidebar.collapsed .sidebar-link:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(0,0,0,.85);
-      color: #fff;
-      font-size: .7rem;
-      font-weight: 500;
-      padding: .25rem .6rem;
-      border-radius: .35rem;
-      white-space: nowrap;
-      pointer-events: none;
-      z-index: 1000;
+      content:attr(data-tooltip);position:absolute;left:calc(100% + 8px);top:50%;
+      transform:translateY(-50%);background:rgba(0,0,0,.85);color:#fff;
+      font-size:.7rem;font-weight:500;padding:.25rem .6rem;border-radius:.35rem;
+      white-space:nowrap;pointer-events:none;z-index:1000;
     }
-    /* Botón toggle del sidebar */
     .sidebar-collapse-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: .5rem;
-      background: none;
-      border: none;
-      border-top: 1px solid rgba(255,255,255,.06);
-      color: var(--color-sidebar-text, #cdccca);
-      cursor: pointer;
-      transition: background 150ms;
+      display:flex;align-items:center;justify-content:center;width:100%;padding:.5rem;
+      background:none;border:none;border-top:1px solid rgba(255,255,255,.06);
+      color:var(--color-sidebar-text,#cdccca);cursor:pointer;transition:background 150ms;
     }
-    .sidebar-collapse-btn:hover {
-      background: rgba(255,255,255,.06);
-    }
-    /* En móvil, empieza colapsado */
-    @media (max-width: 768px) {
-      .admin-sidebar { width: 54px; }
-      .admin-sidebar .sidebar-link span { opacity: 0; width: 0; overflow: hidden; display: inline-block; }
-      .admin-sidebar .sidebar-link { justify-content: center; padding: .625rem; gap: 0; }
-      .admin-sidebar .sidebar-logo img { opacity: 0; pointer-events: none; }
+    .sidebar-collapse-btn:hover { background:rgba(255,255,255,.06); }
+    @media(max-width:768px){
+      .admin-sidebar{width:54px;}
+      .admin-sidebar .sidebar-link span{opacity:0;width:0;overflow:hidden;display:inline-block;}
+      .admin-sidebar .sidebar-link{justify-content:center;padding:.625rem;gap:0;}
+      .admin-sidebar .sidebar-logo img{opacity:0;pointer-events:none;}
     }
   </style>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-  <script>
-    // Inicializar Lucide después de cargar
-    document.addEventListener('DOMContentLoaded', function() {
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    });
-    // Sidebar collapse toggle
-    function toggleSidebar() {
-      var sb = document.getElementById('admin-sidebar');
-      if (!sb) return;
-      sb.classList.toggle('collapsed');
-      var btn = document.getElementById('sidebar-collapse-btn');
-      if (btn) {
-        var isCollapsed = sb.classList.contains('collapsed');
-        btn.setAttribute('aria-label', isCollapsed ? 'Expandir menú' : 'Colapsar menú');
-        btn.querySelector('svg') && btn.querySelector('svg').remove();
-        // el icono lo actualiza lucide en el siguiente tick
-      }
-    }
-  </script>
 </head>
 <body class="admin-layout">
   <a class="sr-only" href="#admin-main">Saltar al contenido</a>
@@ -204,3 +126,14 @@ $baseUrl   = BASE_URL;
     <div class="flash flash--<?= $flash['type'] ?>" role="alert"><?= htmlspecialchars($flash['message']) ?></div>
     <?php endif; ?>
     <main id="admin-main" class="admin-main">
+
+  <!-- Lucide al final del <head> → sin defer, se ejecuta bloqueante pero el DOM ya existe -->
+  <script src="https://unpkg.com/lucide@0.441.0/dist/umd/lucide.min.js"></script>
+  <script>
+    lucide.createIcons();
+    function toggleSidebar(){
+      var sb=document.getElementById('admin-sidebar');
+      if(!sb)return;
+      sb.classList.toggle('collapsed');
+    }
+  </script>
