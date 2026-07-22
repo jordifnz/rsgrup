@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * TopicModel — antes DeliveryModel.
+ * Un Tema pertenece a un Curso y tiene exam_id + pdf_file.
+ * Los alumnos NO se inscriben a Temas, sino a Entregas.
+ */
 class TopicModel
 {
     public static function findById(int $id): ?array
@@ -8,65 +13,51 @@ class TopicModel
         return Database::fetch('SELECT * FROM rsgrup_topics WHERE id=?', [$id]) ?: null;
     }
 
-    /** Temas activos de una entrega, con título del examen vinculado */
-    public static function findByDelivery(int $deliveryId): array
+    public static function findBySlug(string $slug): ?array
     {
-        return Database::fetchAll(
-            'SELECT t.*, e.title AS exam_title
-             FROM rsgrup_topics t
-             LEFT JOIN rsgrup_exams e ON e.id = t.exam_id
-             WHERE t.delivery_id = ? AND t.active = 1
-             ORDER BY t.sort_order ASC, t.id ASC',
-            [$deliveryId]
-        );
-    }
-
-    /** Todos los temas (incluso inactivos), para el panel admin */
-    public static function allByDelivery(int $deliveryId): array
-    {
-        return Database::fetchAll(
-            'SELECT t.*, e.title AS exam_title
-             FROM rsgrup_topics t
-             LEFT JOIN rsgrup_exams e ON e.id = t.exam_id
-             WHERE t.delivery_id = ?
-             ORDER BY t.sort_order ASC, t.id ASC',
-            [$deliveryId]
-        );
+        return Database::fetch('SELECT * FROM rsgrup_topics WHERE slug=? AND active=1', [$slug]) ?: null;
     }
 
     public static function findByExamId(int $examId): ?array
     {
-        return Database::fetch(
-            'SELECT * FROM rsgrup_topics WHERE exam_id=?',
-            [$examId]
-        ) ?: null;
+        return Database::fetch('SELECT * FROM rsgrup_topics WHERE exam_id=?', [$examId]) ?: null;
     }
 
-    /**
-     * Devuelve true si el alumno ya tiene un intento aprobado en el examen
-     * del tema indicado.
-     */
-    public static function isPassed(int $userId, int $topicId): bool
+    /** Todos los temas de una entrega concreta, ordenados */
+    public static function getByDelivery(int $deliveryId): array
     {
-        $topic = self::findById($topicId);
-        if (!$topic || !$topic['exam_id']) return false;
-        $attempt = ExamModel::getLastAttempt($userId, (int)$topic['exam_id']);
-        return $attempt && ExamModel::isPassing((float)$attempt['score']);
+        return Database::fetchAll(
+            'SELECT t.*, dt.sort_order AS pivot_sort
+             FROM rsgrup_topics t
+             JOIN rsgrup_delivery_topics dt ON dt.topic_id = t.id
+             WHERE dt.delivery_id = ? AND t.active = 1
+             ORDER BY dt.sort_order ASC, t.sort_order ASC',
+            [$deliveryId]
+        );
     }
 
-    /**
-     * Genera un nombre de fichero seguro para el PDF de un tema.
-     */
-    public static function pdfFilename(string $title, string $dir): string
+    /** Todos los temas activos (para el selector admin) */
+    public static function getAll(): array
     {
-        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
-        $base = preg_replace('/\s+/', '_', trim((string)$base));
-        $base = preg_replace('/[^A-Za-z0-9_\-]/', '', (string)$base);
-        $base = trim((string)$base, '_-') ?: 'tema';
-        $filename = $base . '.pdf';
-        if (!file_exists($dir . '/' . $filename)) return $filename;
-        $i = 2;
-        do { $filename = $base . '_' . $i . '.pdf'; $i++; } while (file_exists($dir . '/' . $filename));
-        return $filename;
+        return Database::fetchAll(
+            'SELECT t.*, c.title AS course_title
+             FROM rsgrup_topics t
+             LEFT JOIN rsgrup_courses c ON c.id = t.course_id
+             WHERE t.active = 1
+             ORDER BY t.sort_order ASC',
+        );
+    }
+
+    /** Todos los temas (incluidos inactivos) para el panel admin */
+    public static function getAllAdmin(): array
+    {
+        return Database::fetchAll(
+            'SELECT t.*, c.title AS course_title,
+                    e.title AS exam_title
+             FROM rsgrup_topics t
+             LEFT JOIN rsgrup_courses c ON c.id = t.course_id
+             LEFT JOIN rsgrup_exams   e ON e.id = t.exam_id
+             ORDER BY t.sort_order ASC, t.id ASC'
+        );
     }
 }

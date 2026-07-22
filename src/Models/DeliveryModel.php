@@ -1,8 +1,15 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * DeliveryModel — nivel de inscripción.
+ * Una Entrega pertenece a un Curso, tiene precio y tipo.
+ * Contiene varios Temas (TopicModel) a través de rsgrup_delivery_topics.
+ */
 class DeliveryModel
 {
+    // ── Finders ───────────────────────────────────────────────
+
     public static function findById(int $id): ?array
     {
         return Database::fetch('SELECT * FROM rsgrup_deliveries WHERE id=?', [$id]) ?: null;
@@ -10,28 +17,30 @@ class DeliveryModel
 
     public static function findBySlug(string $slug): ?array
     {
-        return Database::fetch('SELECT * FROM rsgrup_deliveries WHERE slug=? AND active=1', [$slug]) ?: null;
+        return Database::fetch(
+            'SELECT * FROM rsgrup_deliveries WHERE slug=? AND active=1',
+            [$slug]
+        ) ?: null;
     }
 
-    /**
-     * Returns all deliveries with enrollment status for a given user.
-     */
+    /** Entregas con estado de inscripción para un alumno */
     public static function getAllWithEnrollmentStatus(int $userId): array
     {
         return Database::fetchAll(
             'SELECT d.*,
-                    en.id AS enrollment_id, en.status AS enrollment_status
+                    en.id     AS enrollment_id,
+                    en.status AS enrollment_status
              FROM rsgrup_deliveries d
-             LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-             WHERE d.active=1
+             LEFT JOIN rsgrup_enrollments en
+                    ON en.delivery_id = d.id AND en.user_id = ?
+             WHERE d.active = 1
              ORDER BY d.sort_order ASC',
             [$userId]
         );
     }
 
-    /**
-     * Checks if a user can enroll in a delivery.
-     */
+    // ── Inscripciones ──────────────────────────────────────────
+
     public static function canEnroll(int $userId, int $deliveryId): array
     {
         $delivery = self::findById($deliveryId);
@@ -46,9 +55,10 @@ class DeliveryModel
             return ['ok' => true, 'reason' => ''];
         }
 
+        // Requiere matrícula activa
         $matricula = Database::fetch(
             'SELECT en.* FROM rsgrup_enrollments en
-             JOIN rsgrup_deliveries d ON d.id=en.delivery_id
+             JOIN rsgrup_deliveries d ON d.id = en.delivery_id
              WHERE en.user_id=? AND d.type="matricula" AND en.status="active"',
             [$userId]
         );
@@ -56,12 +66,12 @@ class DeliveryModel
             return ['ok' => false, 'reason' => 'Debes completar la matrícula antes de inscribirte a cualquier entrega.'];
         }
 
-        // Entregas anteriores (por sort_order) deben estar activas
+        // Las entregas anteriores (por sort_order) deben estar activas
         $previous = Database::fetchAll(
             'SELECT d.*, en.status AS enrollment_status
              FROM rsgrup_deliveries d
-             LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-             WHERE d.sort_order < ? AND d.active=1 AND d.type != "matricula"
+             LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ?
+             WHERE d.sort_order < ? AND d.active = 1 AND d.type != "matricula"
              ORDER BY d.sort_order ASC',
             [$userId, $delivery['sort_order']]
         );
@@ -72,14 +82,16 @@ class DeliveryModel
             }
         }
 
+        // Práctica: todas las entregas (tipo entrega) deben estar completadas
         if ($delivery['type'] === 'practica') {
-            $pendingEntregas = Database::fetchColumn(
+            $pending = Database::fetchColumn(
                 'SELECT COUNT(*) FROM rsgrup_deliveries d
-                 LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-                 WHERE d.type="entrega" AND d.active=1 AND (en.status IS NULL OR en.status != "active")',
+                 LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ?
+                 WHERE d.type="entrega" AND d.active=1
+                   AND (en.status IS NULL OR en.status != "active")',
                 [$userId]
             );
-            if ($pendingEntregas > 0) {
+            if ($pending > 0) {
                 return ['ok' => false, 'reason' => 'Debes completar todas las entregas antes de inscribirte en la práctica.'];
             }
         }
@@ -140,31 +152,41 @@ class DeliveryModel
     }
 
     /**
-     * El alumno ha completado todas las entregas activas de tipo "entrega"
-     * cuando está inscrito en todas y ha aprobado al menos un examen en
-     * cada uno de sus temas que tienen examen.
+     * El alumno ha completado todas las entregas activas cuando
+     * está inscrito (active) en todas ellas Y todos los temas con
+     * examen vinculado tienen al menos un intento aprobado.
      */
     public static function hasCompletedAll(int $userId): bool
     {
-        // ¿Hay algún tema con examen cuyo examen no esté aprobado por el alumno?
-        $pending = Database::fetchColumn(
+        // Todas las entregas activas deben tener inscripción activa
+        $pendingDeliveries = Database::fetchColumn(
+            'SELECT COUNT(*) FROM rsgrup_deliveries d
+             LEFT JOIN rsgrup_enrollments en
+                    ON en.delivery_id = d.id AND en.user_id = ?
+             WHERE d.active = 1
+               AND (en.status IS NULL OR en.status != "active")',
+            [$userId]
+        );
+        if ((int)$pendingDeliveries > 0) return false;
+
+        // Todos los temas con examen deben tener intento aprobado
+        $pendingExams = Database::fetchColumn(
             'SELECT COUNT(*)
              FROM rsgrup_topics t
-             JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1 AND d.type = "entrega"
-             JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
-             WHERE t.active = 1
-               AND t.exam_id IS NOT NULL
+             JOIN rsgrup_delivery_topics dt ON dt.topic_id = t.id
+             JOIN rsgrup_deliveries d       ON d.id = dt.delivery_id AND d.active = 1
+             JOIN rsgrup_enrollments en     ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
+             WHERE t.exam_id IS NOT NULL
                AND NOT EXISTS (
                    SELECT 1 FROM rsgrup_exam_attempts ea
-                   WHERE ea.user_id = ? AND ea.exam_id = t.exam_id
+                   WHERE ea.exam_id = t.exam_id AND ea.user_id = ?
                      AND ea.score >= (
-                         SELECT COALESCE(CAST(s.value AS DECIMAL(5,2)), 60)
-                         FROM rsgrup_settings s WHERE s.`key` = "exam_passing_score"
-                         LIMIT 1
+                         SELECT COALESCE(CAST(value AS DECIMAL(5,2)), 60)
+                         FROM rsgrup_settings WHERE `key` = "passing_score"
                      )
                )',
             [$userId, $userId]
         );
-        return (int)$pending === 0;
+        return (int)$pendingExams === 0;
     }
 }
