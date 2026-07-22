@@ -9,6 +9,9 @@ RewriteEngine On
 
 # ============================================================
 # LÍMITES DE SUBIDA DE ARCHIVOS (PDFs de temas)
+# Nota: php_value sólo funciona con mod_php (Apache embebido).
+# Si el servidor usa PHP-FPM (Plesk), ajusta los valores desde
+# Plesk > Dominios > rsgrup > PHP Settings.
 # ============================================================
 <IfModule mod_php.c>
     php_value upload_max_filesize 64M
@@ -16,10 +19,6 @@ RewriteEngine On
     php_value memory_limit        128M
     php_value max_execution_time  120
     php_value max_input_time      120
-</IfModule>
-# Para PHP-FPM / php-fpm (Plesk/cPanel usan esta directiva)
-<IfModule mod_fcgid.c>
-    FcgidMaxRequestLen 71303168
 </IfModule>
 
 # ============================================================
