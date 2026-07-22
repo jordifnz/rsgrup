@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ─────────────────────────────────────────��─────
+    // ── Dashboard ─────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -415,7 +415,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    // ── API Tokens ──────────────────────���───────────────────
+    // ── API Tokens ────────────────────────────────────────────
     public function createToken(array $params = []): void
     {
         $this->boot();
@@ -442,11 +442,17 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    // ── Títulos: impresión masiva ───────────────────────────────
+    // ── Títulos: impresión masiva ─────────────────────────────
 
     /**
      * GET /admin/titulos-masivos
-     * Lista paginada (20/pág, DESC) de alumnos inscritos con examen realizado.
+     *
+     * Muestra UN registro por alumno. Condición de aparición:
+     *   1. Inscrito (status=active) en TODAS las entregas activas de su curso.
+     *   2. Ha realizado al menos un examen en cualquiera de esas inscripciones.
+     *
+     * Se muestra la fecha de la inscripción de matrícula (type='matricula').
+     * Si el curso no tiene entrega de tipo matrícula se usa la fecha más antigua.
      */
     public function titlesBulk(array $params = []): void
     {
@@ -456,56 +462,77 @@ class AdminController
         $page    = max(1, (int)($_GET['page'] ?? 1));
         $offset  = ($page - 1) * $perPage;
 
-        // Total para paginación
-        $totalRows = (int) Database::fetchColumn(
-            "SELECT COUNT(*) FROM rsgrup_enrollments en
-             JOIN rsgrup_users u ON u.id = en.user_id
-             JOIN rsgrup_deliveries d ON d.id = en.delivery_id
-             JOIN rsgrup_exam_attempts ea ON ea.enrollment_id = en.id
-             WHERE en.status = 'active'
-             GROUP BY en.id
-             LIMIT 1000000"
-        );
-        // COUNT(*) sobre subquery pa obtener total real
-        $totalRows = (int) Database::fetchColumn(
-            "SELECT COUNT(*) FROM (
-                SELECT en.id
-                FROM rsgrup_enrollments en
-                JOIN rsgrup_users u   ON u.id  = en.user_id
-                JOIN rsgrup_deliveries d ON d.id = en.delivery_id
-                WHERE en.status = 'active'
-                  AND EXISTS (
-                      SELECT 1 FROM rsgrup_exam_attempts ea
-                      WHERE ea.enrollment_id = en.id
-                  )
-             ) sub"
-        );
-
-        $rows = Database::fetchAll(
-            "SELECT
-                en.id          AS enrollment_id,
+        /*
+         * Lógica:
+         *   - Por cada curso, contamos cuántas entregas activas tiene.
+         *   - Para cada alumno, contamos cuántas de esas entregas tiene cubiertas
+         *     con una inscripción activa.
+         *   - Solo aparecen cuando ambos conteos coinciden (= inscrito en TODAS).
+         *   - Además debe existir al menos un exam_attempt ligado a alguna de
+         *     sus inscripciones en ese curso.
+         */
+        $baseSql = "
+            SELECT
+                u.id           AS user_id,
                 u.name,
                 u.surnames,
                 u.email,
-                d.title        AS delivery_title,
-                DATE_FORMAT(en.created_at,'%d/%m/%Y') AS enrolled_at,
+                c.id           AS course_id,
+                c.title        AS course_title,
+                DATE_FORMAT(
+                    COALESCE(
+                        MIN(CASE WHEN d.type = 'matricula' THEN en.created_at END),
+                        MIN(en.created_at)
+                    ),
+                    '%d/%m/%Y'
+                )              AS enrolled_at,
                 (
                     SELECT ea2.score
-                    FROM rsgrup_exam_attempts ea2
-                    WHERE ea2.enrollment_id = en.id
+                    FROM   rsgrup_exam_attempts ea2
+                    JOIN   rsgrup_enrollments   en2 ON en2.id = ea2.enrollment_id
+                    WHERE  en2.user_id   = u.id
+                      AND  en2.delivery_id IN (
+                               SELECT id FROM rsgrup_deliveries
+                               WHERE course_id = c.id AND active = 1
+                           )
                     ORDER BY ea2.created_at DESC
                     LIMIT 1
                 ) AS score
-             FROM rsgrup_enrollments en
-             JOIN rsgrup_users u      ON u.id  = en.user_id
-             JOIN rsgrup_deliveries d ON d.id  = en.delivery_id
-             WHERE en.status = 'active'
-               AND EXISTS (
-                   SELECT 1 FROM rsgrup_exam_attempts ea
-                   WHERE ea.enrollment_id = en.id
-               )
-             ORDER BY en.created_at DESC
-             LIMIT ? OFFSET ?",
+            FROM rsgrup_users u
+            JOIN rsgrup_enrollments  en ON en.user_id    = u.id
+                                       AND en.status     = 'active'
+            JOIN rsgrup_deliveries   d  ON d.id          = en.delivery_id
+                                       AND d.active       = 1
+            JOIN rsgrup_courses      c  ON c.id          = d.course_id
+                                       AND c.active       = 1
+            GROUP BY u.id, c.id
+            HAVING
+                -- inscrito en TODAS las entregas activas del curso
+                COUNT(DISTINCT en.delivery_id) = (
+                    SELECT COUNT(*)
+                    FROM   rsgrup_deliveries d2
+                    WHERE  d2.course_id = c.id
+                      AND  d2.active    = 1
+                )
+                -- y ha realizado al menos un examen
+                AND EXISTS (
+                    SELECT 1
+                    FROM   rsgrup_exam_attempts ea
+                    JOIN   rsgrup_enrollments   en3 ON en3.id = ea.enrollment_id
+                    WHERE  en3.user_id     = u.id
+                      AND  en3.delivery_id IN (
+                               SELECT id FROM rsgrup_deliveries
+                               WHERE course_id = c.id AND active = 1
+                           )
+                )
+        ";
+
+        $totalRows = (int) Database::fetchColumn(
+            "SELECT COUNT(*) FROM ({$baseSql}) sub"
+        );
+
+        $rows = Database::fetchAll(
+            "{$baseSql} ORDER BY enrolled_at DESC LIMIT ? OFFSET ?",
             [$perPage, $offset]
         );
 
@@ -517,47 +544,57 @@ class AdminController
 
     /**
      * POST /admin/titulos-masivos/generar
-     * Recibe enrollment_ids[], genera un PDF con un título por página
-     * usando CertificateService y lo devuelve al navegador.
+     * Recibe user_ids[] + course_id[] (pares), genera un PDF con un título
+     * por alumno y lo devuelve al navegador.
      */
     public function titlesBulkGenerate(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
 
-        $rawIds = isset($_POST['enrollment_ids']) && is_array($_POST['enrollment_ids'])
-            ? $_POST['enrollment_ids']
+        // Recibimos pares user_id|course_id codificados como "userId_courseId"
+        $rawIds = isset($_POST['bulk_keys']) && is_array($_POST['bulk_keys'])
+            ? $_POST['bulk_keys']
             : [];
-        $enrollmentIds = array_values(array_unique(array_map('intval', $rawIds)));
-        $enrollmentIds = array_filter($enrollmentIds, fn($id) => $id > 0);
 
-        if (empty($enrollmentIds)) {
+        if (empty($rawIds)) {
             $_SESSION['flash_error'] = 'No se seleccionó ningún alumno.';
             header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
         }
 
-        // Recuperar datos de cada inscripción
-        $placeholders = implode(',', array_fill(0, count($enrollmentIds), '?'));
-        $rows = Database::fetchAll(
-            "SELECT
-                en.id AS enrollment_id,
-                u.name, u.surnames, u.email,
-                d.title AS delivery_title
-             FROM rsgrup_enrollments en
-             JOIN rsgrup_users u      ON u.id  = en.user_id
-             JOIN rsgrup_deliveries d ON d.id  = en.delivery_id
-             WHERE en.id IN ({$placeholders})
-               AND en.status = 'active'
-             ORDER BY FIELD(en.id, {$placeholders})",
-            array_merge($enrollmentIds, $enrollmentIds)
-        );
+        // Reconstruir los datos necesarios para generar cada título
+        $rows = [];
+        foreach ($rawIds as $key) {
+            [$userId, $courseId] = array_map('intval', explode('_', $key));
+            if (!$userId || !$courseId) continue;
+
+            $row = Database::fetchOne(
+                "SELECT
+                    u.name, u.surnames, u.email,
+                    c.title AS delivery_title,
+                    DATE_FORMAT(
+                        COALESCE(
+                            MIN(CASE WHEN d.type = 'matricula' THEN en.created_at END),
+                            MIN(en.created_at)
+                        ),
+                        '%d/%m/%Y'
+                    ) AS enrolled_at
+                 FROM rsgrup_users u
+                 JOIN rsgrup_enrollments en ON en.user_id = u.id AND en.status = 'active'
+                 JOIN rsgrup_deliveries  d  ON d.id = en.delivery_id AND d.course_id = ?
+                 JOIN rsgrup_courses     c  ON c.id = d.course_id
+                 WHERE u.id = ?
+                 GROUP BY u.id, c.id",
+                [$courseId, $userId]
+            );
+            if ($row) $rows[] = $row;
+        }
 
         if (empty($rows)) {
-            $_SESSION['flash_error'] = 'No se encontraron inscripciones válidas.';
+            $_SESSION['flash_error'] = 'No se encontraron datos válidos.';
             header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
         }
 
-        // Generar PDF masivo vía CertificateService
         $pdfContent = CertificateService::generateBulk($rows);
 
         header('Content-Type: application/pdf');

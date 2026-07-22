@@ -41,13 +41,13 @@ $pages    = $total > 0 ? (int)ceil($total / $perPage) : 1;
       </div>
 
       <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-4)">
-        Alumnos inscritos que han realizado al menos un examen · <strong><?= $total ?></strong> registros
+        Alumnos inscritos en todas las entregas del curso y con examen realizado · <strong><?= $total ?></strong> registros
       </p>
 
       <?php if (empty($rows)): ?>
         <div style="text-align:center;padding:var(--space-12);color:var(--color-text-muted)">
           <i data-lucide="inbox" style="width:40px;height:40px;margin-bottom:var(--space-3)"></i>
-          <p>No hay alumnos con exámenes realizados.</p>
+          <p>No hay alumnos que cumplan los requisitos todavía.</p>
         </div>
       <?php else: ?>
 
@@ -57,19 +57,19 @@ $pages    = $total > 0 ? (int)ceil($total / $perPage) : 1;
         <div class="delivery-list">
 
           <!-- Cabecera de tabla -->
-          <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 1fr auto;gap:var(--space-2);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);border-bottom:1px solid var(--color-divider)">
+          <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr auto;gap:var(--space-2);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);border-bottom:1px solid var(--color-divider)">
             <span></span>
             <span>Alumno</span>
             <span>Email</span>
-            <span>Entrega</span>
             <span>Fecha matrícula</span>
             <span>Nota</span>
           </div>
 
           <?php foreach ($rows as $row): ?>
-          <div class="delivery-row enrolled" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 1fr auto;gap:var(--space-2);align-items:center">
+          <?php $bulkKey = (int)$row['user_id'] . '_' . (int)$row['course_id']; ?>
+          <div class="delivery-row enrolled" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr auto;gap:var(--space-2);align-items:center">
             <div>
-              <input type="checkbox" name="enrollment_ids[]" value="<?= (int)$row['enrollment_id'] ?>"
+              <input type="checkbox" name="bulk_keys[]" value="<?= htmlspecialchars($bulkKey) ?>"
                      class="bulk-check" style="width:16px;height:16px;cursor:pointer;accent-color:var(--color-primary)">
             </div>
             <div style="font-size:var(--text-sm);font-weight:500">
@@ -77,9 +77,6 @@ $pages    = $total > 0 ? (int)ceil($total / $perPage) : 1;
             </div>
             <div style="font-size:var(--text-xs);color:var(--color-text-muted)">
               <?= htmlspecialchars($row['email']) ?>
-            </div>
-            <div style="font-size:var(--text-xs)">
-              <?= htmlspecialchars($row['delivery_title']) ?>
             </div>
             <div style="font-size:var(--text-xs);color:var(--color-text-muted)">
               <?= htmlspecialchars($row['enrolled_at']) ?>
