@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class EnrollmentController
 {
-    // ── Vista de una entrega ────────────────────────────────────────────────
+    // ── Vista de una entrega ─────────────────────────────────────────────────────────
     public function showDelivery(array $params = []): void
     {
         requireLogin();
@@ -29,14 +29,25 @@ class EnrollmentController
             $canEnrollReason = $check['reason'];
         }
 
-        // Examen y último intento (solo si inscrito)
+        // Examen y estado de intentos (solo si inscrito)
         $exam          = null;
-        $attempt       = null;
+        $attempt       = null;   // último intento
+        $attempts      = [];     // todos los intentos
+        $attemptCount  = 0;
+        $canRetry      = false;  // puede hacer un nuevo intento ahora
         $examAvailable = ['available' => true, 'reason' => '', 'next' => null];
+
         if ($isEnrolled && $delivery['exam_id']) {
-            $exam          = ExamModel::findWithQuestions((int)$delivery['exam_id']);
-            $attempt       = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
+            $exam         = ExamModel::findWithQuestions((int)$delivery['exam_id']);
+            $attempt      = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
+            $attempts     = ExamModel::getAllAttempts($userId, (int)$delivery['exam_id']);
+            $attemptCount = count($attempts);
             $examAvailable = ExamModel::isAvailable();
+
+            // Puede reintentar si: suspendió el último intento Y tiene menos de 2 intentos
+            if ($attempt && !ExamModel::isPassing((float)$attempt['score']) && $attemptCount < 2) {
+                $canRetry = true;
+            }
         }
 
         $metaTitle = htmlspecialchars($delivery['title']);
@@ -44,7 +55,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/delivery.php';
     }
 
-    // ── Formulario de confirmación de inscripción ───────────────────────────
+    // ── Formulario de confirmación de inscripción ─────────────────────────────────────
     public function showEnroll(array $params = []): void
     {
         requireLogin();
@@ -72,7 +83,7 @@ class EnrollmentController
         include BASE_PATH . '/templates/student/enroll_confirm.php';
     }
 
-    // ── Iniciar inscripción / pago ──────────────────────────────────────────
+    // ── Iniciar inscripción / pago ──────────────────────────────────────────────
     public function initiate(array $params = []): void
     {
         requireLogin();
@@ -119,7 +130,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: éxito ──────────────────────────────────────────────
+    // ── Callback PayPal: éxito ──────────────────────────────────────────────────
     public function paypalSuccess(array $params = []): void
     {
         requireLogin();
@@ -148,7 +159,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Callback PayPal: cancelación ────────────────────────────────────────
+    // ── Callback PayPal: cancelación ──────────────────────────────────────────────
     public function paypalCancel(array $params = []): void
     {
         requireLogin();
@@ -159,7 +170,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga de PDF privado ─────────────────────────────────────────────
+    // ── Descarga de PDF privado ──────────────────────────────────────────────────
     public function downloadPdf(array $params = []): void
     {
         requireLogin();
@@ -190,7 +201,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Descarga del título/certificado ────────────────────────────────────
+    // ── Descarga del título/certificado ───────────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
         requireLogin();
@@ -208,7 +219,7 @@ class EnrollmentController
         exit;
     }
 
-    // ── Envío de examen ─────────────────────────────────────────────────────
+    // ── Envío de examen ───────────────────────────────────────────────────────
     public function submitExam(array $params = []): void
     {
         requireLogin();
@@ -239,18 +250,47 @@ class EnrollmentController
             exit;
         }
 
-        if (ExamModel::getLastAttempt($userId, $examId)) {
-            $_SESSION['flash_error'] = 'Ya has realizado este examen.';
-            header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
-            exit;
+        // Verificar número de intentos y estado del último
+        $lastAttempt  = ExamModel::getLastAttempt($userId, $examId);
+        $attemptCount = ExamModel::getAttemptCount($userId, $examId);
+
+        if ($lastAttempt) {
+            $passed = ExamModel::isPassing((float)$lastAttempt['score']);
+
+            if ($passed) {
+                // Ya aprobó: no puede repetir
+                $_SESSION['flash_error'] = 'Ya aprobaste este examen con un ' . $lastAttempt['score'] . '%. No es necesario repetirlo.';
+                header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
+                exit;
+            }
+
+            if ($attemptCount >= 2) {
+                // Ya usó los 2 intentos
+                $_SESSION['flash_error'] = 'Ya has agotado los 2 intentos permitidos para este examen.';
+                header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
+                exit;
+            }
+            // Si llega aquí: suspendió y tiene menos de 2 intentos → se permite continuar
         }
 
         $score = ExamModel::evaluate($examId, $answers);
-        // Pasamos enrollment_id para satisfacer la FK fk_attempts_enrollment
         ExamModel::saveAttempt($userId, $examId, (int)$enrollment['id'], $answers, $score);
-        ActivityLogger::log($userId, 'exam_submitted', "Examen '{$exam['title']}' - Nota: {$score}");
+        ActivityLogger::log($userId, 'exam_submitted', "Examen '{$exam['title']}' - Intento #" . ($attemptCount + 1) . " - Nota: {$score}");
 
-        $_SESSION['flash_success'] = "Examen enviado. Tu nota: {$score}%";
+        $passing   = ExamModel::isPassing($score);
+        $threshold = ExamModel::passingScore();
+
+        if ($passing) {
+            $_SESSION['flash_success'] = "¡Enhorabuena! Has aprobado el examen con un {$score}%.";
+        } else {
+            $newCount = $attemptCount + 1;
+            if ($newCount < 2) {
+                $_SESSION['flash_error'] = "Has obtenido un {$score}% (mínimo para aprobar: {$threshold}%). Tienes una segunda oportunidad para realizarlo.";
+            } else {
+                $_SESSION['flash_error'] = "Has obtenido un {$score}% (mínimo para aprobar: {$threshold}%). Has agotado los 2 intentos permitidos.";
+            }
+        }
+
         header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
         exit;
     }
