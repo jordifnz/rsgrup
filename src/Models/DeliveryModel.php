@@ -14,30 +14,18 @@ class DeliveryModel
     }
 
     /**
-     * Devuelve la entrega que tiene asignado el examen dado.
-     * La FK es deliveries.exam_id → exams.id, no al revés.
-     */
-    public static function findByExamId(int $examId): ?array
-    {
-        return Database::fetch('SELECT * FROM rsgrup_deliveries WHERE exam_id=?', [$examId]) ?: null;
-    }
-
-    /**
      * Returns all deliveries with enrollment status for a given user.
      */
     public static function getAllWithEnrollmentStatus(int $userId): array
     {
         return Database::fetchAll(
             'SELECT d.*,
-                    en.id AS enrollment_id, en.status AS enrollment_status,
-                    ea.score AS exam_score
+                    en.id AS enrollment_id, en.status AS enrollment_status
              FROM rsgrup_deliveries d
              LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-             LEFT JOIN rsgrup_exams ex ON ex.id=d.exam_id
-             LEFT JOIN rsgrup_exam_attempts ea ON ea.exam_id=ex.id AND ea.user_id=?
              WHERE d.active=1
              ORDER BY d.sort_order ASC',
-            [$userId, $userId]
+            [$userId]
         );
     }
 
@@ -49,18 +37,15 @@ class DeliveryModel
         $delivery = self::findById($deliveryId);
         if (!$delivery) return ['ok' => false, 'reason' => 'Entrega no encontrada.'];
 
-        // Check not already actively enrolled
         $existing = self::getEnrollment($userId, $deliveryId);
         if ($existing && $existing['status'] === 'active') {
             return ['ok' => false, 'reason' => 'Ya estás inscrito en esta entrega.'];
         }
 
-        // Matricula: no prerequisites
         if ($delivery['type'] === 'matricula') {
             return ['ok' => true, 'reason' => ''];
         }
 
-        // All others require active matricula
         $matricula = Database::fetch(
             'SELECT en.* FROM rsgrup_enrollments en
              JOIN rsgrup_deliveries d ON d.id=en.delivery_id
@@ -71,28 +56,22 @@ class DeliveryModel
             return ['ok' => false, 'reason' => 'Debes completar la matrícula antes de inscribirte a cualquier entrega.'];
         }
 
-        // Previous deliveries by sort_order must all be actively enrolled
+        // Entregas anteriores (por sort_order) deben estar activas
         $previous = Database::fetchAll(
-            'SELECT d.*, en.status AS enrollment_status, ea.score
+            'SELECT d.*, en.status AS enrollment_status
              FROM rsgrup_deliveries d
              LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-             LEFT JOIN rsgrup_exams ex ON ex.id=d.exam_id
-             LEFT JOIN rsgrup_exam_attempts ea ON ea.exam_id=ex.id AND ea.user_id=?
              WHERE d.sort_order < ? AND d.active=1 AND d.type != "matricula"
              ORDER BY d.sort_order ASC',
-            [$userId, $userId, $delivery['sort_order']]
+            [$userId, $delivery['sort_order']]
         );
 
         foreach ($previous as $prev) {
             if (($prev['enrollment_status'] ?? '') !== 'active') {
                 return ['ok' => false, 'reason' => 'Debes inscribirte y completar las entregas anteriores en orden.'];
             }
-            if ($prev['type'] === 'entrega' && $prev['score'] === null && $prev['exam_id']) {
-                return ['ok' => false, 'reason' => 'Debes realizar el exámen de la entrega anterior antes de continuar.'];
-            }
         }
 
-        // Practica: all entregas must be completed
         if ($delivery['type'] === 'practica') {
             $pendingEntregas = Database::fetchColumn(
                 'SELECT COUNT(*) FROM rsgrup_deliveries d
@@ -121,15 +100,6 @@ class DeliveryModel
         return Database::fetch('SELECT * FROM rsgrup_enrollments WHERE id=?', [$id]) ?: null;
     }
 
-    /**
-     * Crea o actualiza una inscripción.
-     *
-     * Si ya existe una fila (user_id, delivery_id) con status 'pending' o 'cancelled'
-     * (p.ej. el usuario fue a PayPal, canceló y reintenta), se actualiza en lugar de
-     * insertar una nueva, evitando el error de clave duplicada en uq_enrollment.
-     *
-     * Si la fila ya existe con status 'active', canEnroll() ya habrá bloqueado la llamada.
-     */
     public static function createEnrollment(
         int $userId, int $deliveryId, ?string $orderId, string $status
     ): void {
@@ -169,17 +139,30 @@ class DeliveryModel
         );
     }
 
+    /**
+     * El alumno ha completado todas las entregas activas de tipo "entrega"
+     * cuando está inscrito en todas y ha aprobado al menos un examen en
+     * cada uno de sus temas que tienen examen.
+     */
     public static function hasCompletedAll(int $userId): bool
     {
+        // ¿Hay algún tema con examen cuyo examen no esté aprobado por el alumno?
         $pending = Database::fetchColumn(
-            'SELECT COUNT(*) FROM rsgrup_deliveries d
-             LEFT JOIN rsgrup_enrollments en ON en.delivery_id=d.id AND en.user_id=?
-             LEFT JOIN rsgrup_exams ex ON ex.id=d.exam_id
-             LEFT JOIN rsgrup_exam_attempts ea ON ea.exam_id=ex.id AND ea.user_id=?
-             WHERE d.active=1
-               AND d.type="entrega"
-               AND (en.status IS NULL OR en.status!="active"
-                    OR (ex.id IS NOT NULL AND ea.id IS NULL))',
+            'SELECT COUNT(*)
+             FROM rsgrup_topics t
+             JOIN rsgrup_deliveries d ON d.id = t.delivery_id AND d.active = 1 AND d.type = "entrega"
+             JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.user_id = ? AND en.status = "active"
+             WHERE t.active = 1
+               AND t.exam_id IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM rsgrup_exam_attempts ea
+                   WHERE ea.user_id = ? AND ea.exam_id = t.exam_id
+                     AND ea.score >= (
+                         SELECT COALESCE(CAST(s.value AS DECIMAL(5,2)), 60)
+                         FROM rsgrup_settings s WHERE s.`key` = "exam_passing_score"
+                         LIMIT 1
+                     )
+               )',
             [$userId, $userId]
         );
         return (int)$pending === 0;
