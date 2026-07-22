@@ -97,17 +97,18 @@ $attachmentsByTopic = TopicModel::attachmentsForDelivery((int)$delivery['id']);
             box-shadow: var(--shadow-sm);
           ">
 
-            <!-- Encabezado del tema -->
+            <!-- Encabezado del tema con color de acento -->
             <div style="
-              display:flex;
-              align-items:center;
-              gap:var(--space-2);
+              display: flex;
+              align-items: center;
+              gap: var(--space-2);
               padding: var(--space-3) var(--space-4);
-              background: var(--color-surface-offset);
+              background: var(--color-primary-highlight);
               border-bottom: 1px solid var(--color-border);
+              border-left: 3px solid var(--color-primary);
             ">
-              <i data-lucide="book-open" style="width:15px;height:15px;flex-shrink:0;color:var(--color-text-muted)"></i>
-              <span style="font-size:var(--text-sm);font-weight:700"><?= htmlspecialchars($topic['title']) ?></span>
+              <i data-lucide="book-open" style="width:15px;height:15px;flex-shrink:0;color:var(--color-primary)"></i>
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--color-primary)"><?= htmlspecialchars($topic['title']) ?></span>
             </div>
 
             <!-- Cuerpo del tema -->
