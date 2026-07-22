@@ -60,6 +60,7 @@ $router->get('/paypal/success',               [EnrollmentController::class, 'pay
 $router->get('/paypal/cancel',                [EnrollmentController::class, 'paypalCancel']);
 $router->get('/descargar-pdf/topic/{id}',     [EnrollmentController::class, 'downloadTopicPdf']);
 $router->get('/descargar-pdf/{id}',           [EnrollmentController::class, 'downloadPdf']);
+$router->get('/descargar-adjunto/{id}',       [EnrollmentController::class, 'downloadAttachment']);
 $router->get('/descargar-titulo',             [EnrollmentController::class, 'downloadCertificate']);
 $router->post('/examen/enviar',               [EnrollmentController::class, 'submitExam']);
 

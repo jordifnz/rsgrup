@@ -253,6 +253,55 @@ class EnrollmentController
         exit;
     }
 
+    // ── Descarga de adjunto adicional de un topic ─────────────────────────────────
+    public function downloadAttachment(array $params = []): void
+    {
+        requireLogin();
+        $attachId = Sanitize::int($params['id'] ?? 0);
+        $userId   = $_SESSION['user_id'];
+
+        // Cargar el adjunto
+        $att = Database::fetch(
+            'SELECT ta.*, t.delivery_id, t.active AS topic_active, t.title AS topic_title
+             FROM rsgrup_topic_attachments ta
+             JOIN rsgrup_topics t ON t.id = ta.topic_id
+             WHERE ta.id = ?',
+            [$attachId]
+        );
+
+        if (!$att || !$att['topic_active']) {
+            http_response_code(404);
+            echo 'Adjunto no encontrado.';
+            exit;
+        }
+
+        // Verificar que el alumno está inscrito en la entrega del topic
+        $enrollment = DeliveryModel::getEnrollment($userId, (int)$att['delivery_id']);
+        if (!$enrollment || $enrollment['status'] !== 'active') {
+            http_response_code(403);
+            echo 'Acceso denegado.';
+            exit;
+        }
+
+        $file = BASE_PATH . '/private_files/attachments/' . $att['filename'];
+        if (!file_exists($file)) {
+            http_response_code(404);
+            echo 'Archivo no encontrado.';
+            exit;
+        }
+
+        ActivityLogger::log($userId, 'attachment_download',
+            'Descarga adjunto: ' . ($att['description'] ?: $att['original_name']) . ' (tema: ' . $att['topic_title'] . ')');
+
+        $mime = mime_content_type($file) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . $att['original_name'] . '"');
+        header('Content-Length: ' . filesize($file));
+        header('X-Accel-Buffering: no');
+        readfile($file);
+        exit;
+    }
+
     // ── Descarga del título/certificado ──────────────────────────────────────────
     public function downloadCertificate(array $params = []): void
     {
