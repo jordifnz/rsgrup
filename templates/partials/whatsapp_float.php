@@ -16,12 +16,12 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
 </a>
 
 <style>
+/*
+ * Estilos base del boton WA. El posicionamiento fixed y z-index se
+ * sobreescriben desde el <head> del layout con !important + transform:translateZ(0)
+ * para garantizar que escapa del containing block del flex/grid body en iOS Safari.
+ */
 .wa-fab {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  /* z-index alto para estar siempre por encima de cualquier layout */
-  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,11 +38,11 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
 }
 .wa-fab:hover,
 .wa-fab:focus-visible {
-  transform: scale(1.1);
+  transform: translateZ(0) scale(1.1);
   box-shadow: 0 6px 20px rgba(37,211,102,.55), 0 2px 6px rgba(0,0,0,.25);
   outline: none;
 }
-.wa-fab:active { transform: scale(.96); }
+.wa-fab:active { transform: translateZ(0) scale(.96); }
 
 .wa-fab__icon {
   width: 1.75rem;
@@ -74,18 +74,14 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
   transform: translateY(-50%) translateX(0);
 }
 
-/* Ligero rebote de entrada para llamar la atención */
 @keyframes wa-bounce {
-  0%, 100% { transform: translateY(0); }
-  40%       { transform: translateY(-.55rem); }
-  60%       { transform: translateY(-.25rem); }
+  0%, 100% { transform: translateZ(0) translateY(0); }
+  40%       { transform: translateZ(0) translateY(-.55rem); }
+  60%       { transform: translateZ(0) translateY(-.25rem); }
 }
 
-/* En móvil sube un poco para no tapar la barra de navegación del SO */
 @media (max-width: 640px) {
   .wa-fab {
-    bottom: 1.25rem;
-    right: 1rem;
     width: 3rem;
     height: 3rem;
   }
@@ -93,7 +89,6 @@ $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $waNumber);
     width: 1.5rem;
     height: 1.5rem;
   }
-  /* El tooltip en móvil no tiene hover, lo ocultamos para no molestar */
   .wa-fab__tooltip { display: none; }
 }
 </style>
