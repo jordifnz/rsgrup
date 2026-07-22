@@ -1,11 +1,6 @@
 <?php
 declare(strict_types=1);
 
-/**
- * TopicModel — antes DeliveryModel.
- * Un Tema pertenece a un Curso y tiene exam_id + pdf_file.
- * Los alumnos NO se inscriben a Temas, sino a Entregas.
- */
 class TopicModel
 {
     public static function findById(int $id): ?array
@@ -13,51 +8,104 @@ class TopicModel
         return Database::fetch('SELECT * FROM rsgrup_topics WHERE id=?', [$id]) ?: null;
     }
 
-    public static function findBySlug(string $slug): ?array
+    /** Temas activos de una entrega, con título del examen vinculado */
+    public static function findByDelivery(int $deliveryId): array
     {
-        return Database::fetch('SELECT * FROM rsgrup_topics WHERE slug=? AND active=1', [$slug]) ?: null;
+        return Database::fetchAll(
+            'SELECT t.*, e.title AS exam_title
+             FROM rsgrup_topics t
+             LEFT JOIN rsgrup_exams e ON e.id = t.exam_id
+             WHERE t.delivery_id = ? AND t.active = 1
+             ORDER BY t.sort_order ASC, t.id ASC',
+            [$deliveryId]
+        );
     }
 
+    /** Todos los temas de una entrega (admin, sin filtro active) */
+    public static function findAllByDelivery(int $deliveryId): array
+    {
+        return Database::fetchAll(
+            'SELECT t.*, e.title AS exam_title
+             FROM rsgrup_topics t
+             LEFT JOIN rsgrup_exams e ON e.id = t.exam_id
+             WHERE t.delivery_id = ?
+             ORDER BY t.sort_order ASC, t.id ASC',
+            [$deliveryId]
+        );
+    }
+
+    public static function create(array $data): int
+    {
+        Database::execute(
+            'INSERT INTO rsgrup_topics
+                 (delivery_id, exam_id, title, description, pdf_file, sort_order, active, created_at, updated_at)
+             VALUES (?,?,?,?,?,?,?,NOW(),NOW())',
+            [
+                $data['delivery_id'],
+                $data['exam_id']    ?? null,
+                $data['title'],
+                $data['description'] ?? null,
+                $data['pdf_file']   ?? null,
+                $data['sort_order'] ?? 0,
+                $data['active']     ?? 1,
+            ]
+        );
+        return (int) Database::lastInsertId();
+    }
+
+    public static function update(int $id, array $data): void
+    {
+        Database::execute(
+            'UPDATE rsgrup_topics
+             SET delivery_id=?, exam_id=?, title=?, description=?, pdf_file=?,
+                 sort_order=?, active=?, updated_at=NOW()
+             WHERE id=?',
+            [
+                $data['delivery_id'],
+                $data['exam_id']    ?? null,
+                $data['title'],
+                $data['description'] ?? null,
+                $data['pdf_file']   ?? null,
+                $data['sort_order'] ?? 0,
+                $data['active']     ?? 1,
+                $id,
+            ]
+        );
+    }
+
+    public static function delete(int $id): void
+    {
+        Database::execute('DELETE FROM rsgrup_topics WHERE id=?', [$id]);
+    }
+
+    /**
+     * Devuelve el tema que tiene asociado el examen dado.
+     * Usado por EnrollmentController::submitExam para mantener compatibilidad.
+     */
     public static function findByExamId(int $examId): ?array
     {
         return Database::fetch('SELECT * FROM rsgrup_topics WHERE exam_id=?', [$examId]) ?: null;
     }
 
-    /** Todos los temas de una entrega concreta, ordenados */
-    public static function getByDelivery(int $deliveryId): array
+    /**
+     * Para cada tema de una entrega, devuelve el último attempt del usuario.
+     * Retorna un mapa [topic_id => attempt_row].
+     */
+    public static function attemptsForDelivery(int $userId, int $deliveryId): array
     {
-        return Database::fetchAll(
-            'SELECT t.*, dt.sort_order AS pivot_sort
-             FROM rsgrup_topics t
-             JOIN rsgrup_delivery_topics dt ON dt.topic_id = t.id
-             WHERE dt.delivery_id = ? AND t.active = 1
-             ORDER BY dt.sort_order ASC, t.sort_order ASC',
-            [$deliveryId]
+        $rows = Database::fetchAll(
+            'SELECT ea.*, t.id AS topic_id
+             FROM rsgrup_exam_attempts ea
+             JOIN rsgrup_topics t ON t.exam_id = ea.exam_id
+                                  AND t.delivery_id = ?
+             WHERE ea.user_id = ?
+             ORDER BY ea.created_at ASC',
+            [$deliveryId, $userId]
         );
-    }
-
-    /** Todos los temas activos (para el selector admin) */
-    public static function getAll(): array
-    {
-        return Database::fetchAll(
-            'SELECT t.*, c.title AS course_title
-             FROM rsgrup_topics t
-             LEFT JOIN rsgrup_courses c ON c.id = t.course_id
-             WHERE t.active = 1
-             ORDER BY t.sort_order ASC',
-        );
-    }
-
-    /** Todos los temas (incluidos inactivos) para el panel admin */
-    public static function getAllAdmin(): array
-    {
-        return Database::fetchAll(
-            'SELECT t.*, c.title AS course_title,
-                    e.title AS exam_title
-             FROM rsgrup_topics t
-             LEFT JOIN rsgrup_courses c ON c.id = t.course_id
-             LEFT JOIN rsgrup_exams   e ON e.id = t.exam_id
-             ORDER BY t.sort_order ASC, t.id ASC'
-        );
+        $map = [];
+        foreach ($rows as $r) {
+            $map[(int)$r['topic_id']] = $r; // queda el último (ORDER ASC)
+        }
+        return $map;
     }
 }
