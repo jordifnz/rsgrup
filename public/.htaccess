@@ -8,6 +8,21 @@ ServerSignature Off
 RewriteEngine On
 
 # ============================================================
+# LÍMITES DE SUBIDA DE ARCHIVOS (PDFs de temas)
+# ============================================================
+<IfModule mod_php.c>
+    php_value upload_max_filesize 64M
+    php_value post_max_size       68M
+    php_value memory_limit        128M
+    php_value max_execution_time  120
+    php_value max_input_time      120
+</IfModule>
+# Para PHP-FPM / php-fpm (Plesk/cPanel usan esta directiva)
+<IfModule mod_fcgid.c>
+    FcgidMaxRequestLen 71303168
+</IfModule>
+
+# ============================================================
 # BLOQUEO DE ARCHIVOS SENSIBLES Y RUTAS DE RECONOCIMIENTO
 # ============================================================
 
@@ -67,9 +82,6 @@ RewriteRule ^ index.php [QSA,L]
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
     # CSP
-    # form-action incluye los dominios de PayPal porque el POST /inscribir
-    # hace un redirect 302 hacia paypal.com, y algunos navegadores aplican
-    # form-action tambien al destino de la redireccion.
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.paypal.com https://www.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src https://www.paypal.com https://www.sandbox.paypal.com; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://api.paypal.com https://api.sandbox.paypal.com; form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paypal.com; base-uri 'self';"
 
     Header always unset Server
