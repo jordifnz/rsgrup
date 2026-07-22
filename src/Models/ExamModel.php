@@ -89,8 +89,9 @@ class ExamModel
         $month  = (int)$now->format('n');
         $year   = (int)$now->format('Y');
 
+        // ── Modo: último sábado del mes ────────────────────────────────────
         if ($schedule === 'last_saturday') {
-            // Calcular el último sábado del mes ACTUAL
+            // Calcular el último sábado del mes actual
             $lastDay    = (int)(new DateTimeImmutable("last day of {$year}-{$month}-01"))->format('j');
             $lastSatDay = $lastDay;
             while ((int)(new DateTimeImmutable("{$year}-{$month}-{$lastSatDay}"))->format('w') !== 6) {
@@ -102,15 +103,11 @@ class ExamModel
                 return ['available' => true, 'reason' => '', 'next' => null];
             }
 
-            // Calcular la próxima fecha:
-            // • Si el último sábado del mes actual AUN NO ha pasado (está en el futuro),
-            //   mostrar ese mismo mes.
-            // • Si ya pasó (dayNum > lastSatDay), saltar al siguiente mes.
+            // Si el último sábado de este mes aún no ha llegado, mostrarlo.
+            // Si ya pasó, saltar al mes siguiente.
             if ($dayNum < $lastSatDay) {
-                // El último sábado del mes actual todavía no ha llegado
                 $nextDate = (new DateTimeImmutable("{$year}-{$month}-{$lastSatDay}"))->format('d/m/Y');
             } else {
-                // Ya pasó: calcular el último sábado del mes siguiente
                 $nextMonth = $month === 12 ? 1       : $month + 1;
                 $nextYear  = $month === 12 ? $year + 1 : $year;
                 $nlastDay  = (int)(new DateTimeImmutable("last day of {$nextYear}-{$nextMonth}-01"))->format('j');
@@ -128,17 +125,40 @@ class ExamModel
             ];
         }
 
+        // ── Modo: días personalizados de la semana ──────────────────────────
         if ($schedule === 'custom_days') {
-            $allowed = array_filter(array_map('intval', explode(',', $customDays)), fn($d) => $d >= 0 && $d <= 6);
+            $allowed = array_values(array_unique(
+                array_filter(array_map('intval', explode(',', $customDays)), fn($d) => $d >= 0 && $d <= 6)
+            ));
+
+            if (empty($allowed)) {
+                // Sin días configurados → fallback siempre disponible
+                return ['available' => true, 'reason' => '', 'next' => null];
+            }
+
             if (in_array($today, $allowed, true)) {
                 return ['available' => true, 'reason' => '', 'next' => null];
             }
-            $names = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+            // Calcular el próximo día permitido a partir de mañana
+            sort($allowed);
+            $nextDate = null;
+            for ($offset = 1; $offset <= 7; $offset++) {
+                $candidate    = $now->modify("+{$offset} days");
+                $candidateDay = (int)$candidate->format('w');
+                if (in_array($candidateDay, $allowed, true)) {
+                    $nextDate = $candidate->format('d/m/Y');
+                    break;
+                }
+            }
+
+            $names    = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             $dayNames = implode(', ', array_map(fn($d) => $names[$d], $allowed));
+
             return [
                 'available' => false,
                 'reason'    => 'Los exámenes solo están disponibles los días: ' . $dayNames . '.',
-                'next'      => null,
+                'next'      => $nextDate,
             ];
         }
 
@@ -214,7 +234,6 @@ class ExamModel
             $title = Sanitize::string($q['title'] ?? '');
             if (!$title) continue;
 
-            // El formulario envía answer_type (radio|checkbox)
             $type = ($q['answer_type'] ?? $q['type'] ?? 'radio') === 'checkbox' ? 'checkbox' : 'radio';
             $sort = (int)$idx;
 
