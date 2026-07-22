@@ -11,7 +11,6 @@ window.openDeliveryModal = function(d) {
   document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
   document.getElementById('d-id').value      = d ? d.id : '';
   document.getElementById('d-title').value   = d ? d.title : '';
-  document.getElementById('d-desc').value    = d ? (d.description || '') : '';
   document.getElementById('d-price').value   = d ? d.price : '0';
   document.getElementById('d-order').value   = d ? d.sort_order : '0';
   var courseEl = document.getElementById('d-course');
@@ -24,7 +23,36 @@ window.openDeliveryModal = function(d) {
   document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
   document.getElementById('d-active').checked       = d ? d.active == 1 : true;
   m.style.display = 'flex';
+
+  // Inicializar TinyMCE (el textarea ya es visible al poner display:flex)
+  var descContent = d ? (d.description || '') : '';
+  if (typeof initEditorInModal === 'function') {
+    initEditorInModal('d-desc', descContent);
+  } else {
+    document.getElementById('d-desc').value = descContent;
+  }
 };
+
+window.closeDeliveryModal = function() {
+  var m = document.getElementById('delivery-modal');
+  // Destruir instancia TinyMCE antes de ocultar
+  if (window.tinymce && tinymce.get('d-desc')) {
+    tinymce.get('d-desc').remove();
+  }
+  if (m) m.style.display = 'none';
+};
+
+// Volcar contenido TinyMCE al textarea antes de enviar el form
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.getElementById('delivery-form');
+  if (form) {
+    form.addEventListener('submit', function() {
+      if (window.tinymce && tinymce.get('d-desc')) {
+        tinymce.get('d-desc').save();
+      }
+    });
+  }
+});
 
 window.loadEnrolled = function(deliveryId) {
   document.getElementById('enrolled-modal').style.display = 'flex';
@@ -104,7 +132,7 @@ window.loadEnrolled = function(deliveryId) {
   <div class="modal-box" style="max-width:640px">
     <div class="modal-header">
       <h2 class="modal-title" id="delivery-modal-title">Nueva Entrega</h2>
-      <button type="button" class="modal-close" onclick="document.getElementById('delivery-modal').style.display='none'">&times;</button>
+      <button type="button" class="modal-close" onclick="closeDeliveryModal()">&times;</button>
     </div>
     <form action="<?= BASE_URL ?>/admin/entregas/guardar" method="POST" id="delivery-form">
       <?= Csrf::field() ?>
@@ -157,7 +185,7 @@ window.loadEnrolled = function(deliveryId) {
         </div>
       </div>
       <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-6)">
-        <button type="button" class="btn" onclick="document.getElementById('delivery-modal').style.display='none'">Cancelar</button>
+        <button type="button" class="btn" onclick="closeDeliveryModal()">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
     </form>
