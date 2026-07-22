@@ -1,5 +1,5 @@
 <?php
-include BASE_PATH . '/templates/student/layout.php';
+include BASE_PATH . '/templates/partials/header.php';
 ?>
 
 <div class="delivery-page">
@@ -168,4 +168,4 @@ include BASE_PATH . '/templates/student/layout.php';
   <?php endif; ?>
 </div>
 
-<?php include BASE_PATH . '/templates/student/layout_close.php'; ?>
+<?php include BASE_PATH . '/templates/partials/footer.php'; ?>
