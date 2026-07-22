@@ -8,9 +8,10 @@ $currentUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 $accentColor = '#e87722';
 try {
-  $db = Database::getInstance();
-  $accentRow = $db->fetchOne("SELECT setting_value FROM rsgrup_settings WHERE setting_key='brand_accent_color'");
-  if ($accentRow && !empty($accentRow['setting_value'])) $accentColor = $accentRow['setting_value'];
+  $accentRow = Database::fetchOne(
+    "SELECT `value` FROM rsgrup_settings WHERE `key`='brand_accent_color' LIMIT 1"
+  );
+  if ($accentRow && !empty($accentRow['value'])) $accentColor = $accentRow['value'];
 } catch(\Throwable $e) {}
 ?>
 <!DOCTYPE html>
@@ -25,7 +26,6 @@ try {
   var t = '';
   try { t = localStorage.getItem('rsgrup-theme') || ''; } catch(e) {}
   document.documentElement.setAttribute('data-theme', t || 'dark');
-  // Colapso sidebar solo en desktop (>= 768px)
   if (window.innerWidth >= 768) {
     var collapsed = false;
     try { collapsed = localStorage.getItem('rsgrup-sidebar-collapsed') === '1'; } catch(e) {}
@@ -42,14 +42,11 @@ try {
     --sidebar-w-collapsed: 56px;
   }
 
-  /* ── Layout raíz ────────────────────────────── */
   .admin-layout {
     display: flex;
     min-height: 100dvh;
-    /* SIN overflow:hidden — lo gestiona cada hijo */
   }
 
-  /* ── Sidebar (desktop) ──────────────────────── */
   .admin-sidebar {
     width: var(--sidebar-w);
     flex-shrink: 0;
@@ -62,7 +59,6 @@ try {
     width: var(--sidebar-w-collapsed);
   }
 
-  /* Ocultar texto de links cuando está colapsado (SOLO desktop) */
   @media (min-width: 768px) {
     .sidebar-collapsed .sidebar-link > span,
     .sidebar-collapsed .sidebar-footer .sidebar-link > span {
@@ -84,9 +80,8 @@ try {
     }
   }
 
-  /* Botón toggle «colapsar» (solo desktop) */
   .sidebar-toggle {
-    display: none; /* oculto en móvil */
+    display: none;
     align-items: center;
     justify-content: center;
     width: 26px;
@@ -115,7 +110,6 @@ try {
     .sidebar-toggle { display: flex; }
   }
 
-  /* ── Móvil: sidebar como drawer ───────────────── */
   @media (max-width: 767px) {
     .admin-sidebar {
       position: fixed !important;
@@ -131,7 +125,6 @@ try {
     .admin-sidebar.mobile-open {
       transform: translateX(0) !important;
     }
-    /* En móvil NUNCA ocultar los textos, independientemente de sidebar-collapsed */
     .admin-sidebar .sidebar-link > span {
       display: inline !important;
     }
@@ -144,7 +137,6 @@ try {
     }
   }
 
-  /* Overlay oscuro (móvil) */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -154,17 +146,15 @@ try {
   }
   .sidebar-overlay.visible { display: block; }
 
-  /* ── Admin-main ────────────────────────────── */
   .admin-main {
     flex: 1;
-    min-width: 0;    /* permite que el flex-child se encoja */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    max-width: 100%; /* no desborda */
+    max-width: 100%;
   }
 
-  /* ── Topbar ───────────────────────────────── */
   .admin-topbar {
     display: flex;
     align-items: center;
@@ -172,7 +162,6 @@ try {
     flex-shrink: 0;
   }
 
-  /* Hamburger (solo móvil) */
   .btn-hamburger {
     display: none;
     align-items: center;
@@ -191,14 +180,12 @@ try {
     .btn-hamburger { display: flex; }
   }
 
-  /* ── Contenido: scroll horizontal ─────────────── */
   .admin-content {
     flex: 1;
     overflow-y: auto;
-    overflow-x: auto;          /* SCROLL HORIZONTAL aquí */
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  /* Tablas con ancho mínimo para no aplastarse */
   .admin-content table {
     min-width: 480px;
   }
@@ -209,12 +196,10 @@ try {
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
-<!-- Overlay móvil -->
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
 <div class="admin-layout">
   <aside class="admin-sidebar" id="admin-sidebar">
-    <!-- Botón colapsar (solo desktop) -->
     <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Colapsar menú">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
@@ -255,7 +240,6 @@ try {
 
   <div class="admin-main">
     <header class="admin-topbar">
-      <!-- Hamburger (móvil) -->
       <button class="btn-hamburger" id="btn-hamburger" aria-label="Abrir menú">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>

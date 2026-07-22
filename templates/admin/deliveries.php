@@ -120,7 +120,7 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 </div>
 
 <script>
-function openDeliveryModal(d) {
+window.openDeliveryModal = function(d) {
   var m = document.getElementById('delivery-modal');
   document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
   document.getElementById('d-id').value      = d ? d.id : '';
@@ -138,9 +138,9 @@ function openDeliveryModal(d) {
   document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
   document.getElementById('d-active').checked       = d ? d.active == 1 : true;
   m.style.display = 'flex';
-}
+};
 
-function loadEnrolled(deliveryId) {
+window.loadEnrolled = function(deliveryId) {
   document.getElementById('enrolled-modal').style.display = 'flex';
   document.getElementById('enrolled-list').innerHTML = '<p style="padding:var(--space-4)">Cargando…</p>';
   fetch('<?= BASE_URL ?>/admin/entregas/' + deliveryId + '/inscritos')
@@ -160,7 +160,7 @@ function loadEnrolled(deliveryId) {
       html += '</tbody></table>';
       document.getElementById('enrolled-list').innerHTML = html;
     });
-}
+};
 </script>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
