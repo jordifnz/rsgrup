@@ -382,7 +382,7 @@ class AdminController
             'paypal_client_id', 'paypal_client_secret', 'paypal_mode',
             'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from_name', 'smtp_from_email',
             'evolution_api_url', 'evolution_api_token', 'evolution_instance',
-            'wa_contact_number',
+            'whatsapp_support_number',
             'email_template_subject', 'email_template_body',
             'whatsapp_template',
             'cert_bg_path', 'cert_name_x', 'cert_name_y', 'cert_name_fontsize', 'cert_name_color',
