@@ -118,14 +118,38 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
   </div>
 </details>
 
-<!-- WHATSAPP CONTACTO -->
+<!-- WHATSAPP SOPORTE AL ALUMNO -->
 <details class="settings-section">
-  <summary>📱 WhatsApp de contacto</summary>
+  <summary>📱 WhatsApp de soporte al alumno</summary>
   <div class="settings-body">
-    <div class="form-group" style="max-width:300px">
-      <label>Número (formato internacional, sin +)</label>
-      <input type="text" name="wa_contact_number" value="<?= htmlspecialchars($s['wa_contact_number'] ?? '') ?>" placeholder="34600000000">
+    <p style="font-size:.875rem;color:var(--color-text-muted);margin-bottom:1rem">
+      Si se configura un número, aparecerá un botón flotante de WhatsApp en todas las páginas de la aplicación
+      para que los alumnos puedan contactar fácilmente con soporte.
+    </p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Número de WhatsApp (formato internacional, sin + ni espacios)</label>
+        <input type="text"
+               name="whatsapp_support_number"
+               value="<?= htmlspecialchars($s['whatsapp_support_number'] ?? '') ?>"
+               placeholder="34600000000"
+               pattern="[0-9]{7,15}"
+               style="max-width:240px">
+        <small style="color:var(--color-text-muted)">Ejemplo: <code>34600123456</code> para un número español. Deja en blanco para ocultar el botón.</small>
+      </div>
     </div>
+    <?php if (!empty($s['whatsapp_support_number'])): ?>
+    <div style="margin-top:.75rem;display:flex;align-items:center;gap:.6rem;font-size:.875rem">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:50%;background:#25d366;color:#fff;flex-shrink:0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.27.86 5.82 2.41a8.22 8.22 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.93-.4-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.32a8.19 8.19 0 0 1-1.26-4.37c.01-4.54 3.7-8.23 8.25-8.23zm-2.9 4.36c-.18 0-.46.07-.7.34-.24.27-.91.89-.91 2.17s.93 2.52 1.06 2.69c.13.18 1.83 2.79 4.43 3.91.62.27 1.1.43 1.48.55.62.2 1.19.17 1.63.1.5-.07 1.53-.63 1.75-1.23.22-.6.22-1.12.15-1.23-.06-.1-.24-.17-.5-.3-.27-.13-1.54-.76-1.78-.85-.24-.09-.41-.13-.58.13-.17.27-.65.85-.8 1.02-.14.18-.29.2-.54.07-.25-.14-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.39-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.38-.43.12-.14.16-.24.24-.41.08-.17.04-.31-.02-.44-.06-.13-.57-1.38-.79-1.89-.2-.48-.41-.42-.57-.43l-.48-.01z"/></svg>
+      </span>
+      <span>El botón flotante está <strong>activo</strong> con el número <code><?= htmlspecialchars($s['whatsapp_support_number']) ?></code></span>
+    </div>
+    <?php else: ?>
+    <div style="margin-top:.75rem;font-size:.875rem;color:var(--color-text-muted)">
+      ℹ️ El botón flotante está <strong>oculto</strong> (no hay número configurado).
+    </div>
+    <?php endif; ?>
   </div>
 </details>
 
