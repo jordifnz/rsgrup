@@ -18,32 +18,96 @@ class CertificateService
     private const FONT_NAME      = 'Inter-Bold.ttf';
     private const FONT_CACHE_DIR = '/tmp/rsgrup_fonts';
 
-    /**
-     * Mirrors de Inter Bold en orden de fiabilidad.
-     * Si el primero falla, se prueba el siguiente.
-     */
-    private const FONT_MIRRORS = [
-        // jsDelivr CDN — muy rápido y fiable
-        'https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/docs/font-files/Inter-Bold.woff2',
-        // Google Fonts static — la propia fuente Inter Bold (woff2)
-        'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2',
-        // Bunny Fonts (alternativa a Google sin tracking)
-        'https://fonts.bunny.net/inter/files/inter-latin-700-normal.woff2',
-    ];
-
-    // TTF puro (woff2 no sirve a GD/FreeType, necesitamos TTF real)
     private const TTF_MIRRORS = [
-        // GitHub raw de rsms/inter — repositorio oficial de Inter
         'https://raw.githubusercontent.com/rsms/inter/v4.0/src/static/Inter-Bold.ttf',
-        // jsDelivr apuntando al mismo repo
         'https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/src/static/Inter-Bold.ttf',
-        // Mirror de Google Fonts API para Inter Bold weight 700 TTF
         'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZNhiJ-Ek-_EeA.ttf',
     ];
 
-    // ── Punto de entrada ────────────────────────────────────────────
+    // ── Punto de entrada único (un alumno) ──────────────────────────
 
     public function generate(array $user): void
+    {
+        $img      = $this->buildImage($user);
+        if ($img === null) return;
+        $fullName = trim(($user['name'] ?? '') . ' ' . ($user['surnames'] ?? ''));
+        $this->outputPdf($img, $fullName);
+        imagedestroy($img);
+    }
+
+    // ── Punto de entrada masivo ─────────────────────────────────────
+
+    /**
+     * generateBulk — devuelve el contenido binario de un PDF
+     * con una página por alumno (sin enviar headers).
+     *
+     * @param  array  $rows  Filas con keys: name, surnames, delivery_title
+     * @return string        Contenido PDF binario
+     */
+    public static function generateBulk(array $rows): string
+    {
+        $self = new self();
+        $self->loadFpdf();
+
+        $bgPath   = $self->resolveBgPath($self->getSetting('cert_bg_path', '/public/uploads/certificates/background.png'));
+        $nameX    = (int)$self->getSetting('cert_name_x',        '400');
+        $nameY    = (int)$self->getSetting('cert_name_y',        '300');
+        $fontSize = (int)$self->getSetting('cert_name_fontsize', '36');
+        $color    = ltrim($self->getSetting('cert_name_color',   '#000000'), '#');
+        $fontPath = $self->resolveFont();
+
+        $pdf = new \FPDF('L', 'mm', 'A4');
+
+        foreach ($rows as $row) {
+            $fullName = trim(($row['name'] ?? '') . ' ' . ($row['surnames'] ?? ''));
+
+            // Cargamos el fondo
+            if (!file_exists($bgPath)) {
+                $img = imagecreatetruecolor(2970, 2100);
+                imagefill($img, 0, 0, imagecolorallocate($img, 255, 255, 255));
+            } else {
+                $ext = strtolower(pathinfo($bgPath, PATHINFO_EXTENSION));
+                $img = match ($ext) {
+                    'jpg', 'jpeg' => imagecreatefromjpeg($bgPath),
+                    'png'         => imagecreatefrompng($bgPath),
+                    default       => false,
+                };
+                if (!$img) continue;
+            }
+
+            imagealphablending($img, true);
+            imagesavealpha($img, true);
+
+            $hex       = str_pad($color, 6, '0');
+            $textColor = imagecolorallocate(
+                $img,
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2))
+            );
+
+            if ($fontPath !== null) {
+                imagettftext($img, $fontSize, 0, $nameX, $nameY, $textColor, $fontPath, $fullName);
+            } else {
+                $self->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
+            }
+
+            $tmpImg = sys_get_temp_dir() . '/cert_bulk_' . uniqid() . '.png';
+            imagepng($img, $tmpImg);
+            imagedestroy($img);
+
+            $pdf->AddPage();
+            $pdf->Image($tmpImg, 0, 0, 297, 210);
+            @unlink($tmpImg);
+        }
+
+        // F = devuelve el PDF como string
+        return $pdf->Output('S');
+    }
+
+    // ── Construir imagen para un alumno ─────────────────────────────
+
+    private function buildImage(array $user): ?\GdImage
     {
         $rawPath  = $this->getSetting('cert_bg_path', '/public/uploads/certificates/background.png');
         $bgPath   = $this->resolveBgPath($rawPath);
@@ -56,7 +120,7 @@ class CertificateService
         if (!file_exists($bgPath)) {
             http_response_code(404);
             echo 'Fondo del título no configurado. Sube un PNG en Ajustes > Título de alumnos.';
-            return;
+            return null;
         }
 
         $ext = strtolower(pathinfo($bgPath, PATHINFO_EXTENSION));
@@ -67,7 +131,7 @@ class CertificateService
         };
         if (!$img) {
             echo 'Error al cargar la imagen de fondo.';
-            return;
+            return null;
         }
 
         imagealphablending($img, true);
@@ -82,22 +146,19 @@ class CertificateService
         );
 
         $fontPath = $this->resolveFont();
-
         if ($fontPath !== null) {
             imagettftext($img, $fontSize, 0, $nameX, $nameY, $textColor, $fontPath, $fullName);
         } else {
             $this->drawTextFallback($img, $fullName, $nameX, $nameY, $fontSize, $textColor);
         }
 
-        $this->outputPdf($img, $fullName);
-        imagedestroy($img);
+        return $img;
     }
 
     // ── Resolución de fuente ────────────────────────────────────────
 
     private function resolveFont(): ?string
     {
-        // 1. Fuentes del repo (cualquier TTF Bold válido)
         $repoCandidates = [
             BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/NotoSans-Bold.ttf',
@@ -109,8 +170,6 @@ class CertificateService
                 return $path;
             }
         }
-
-        // 2. Caché en /tmp
         return $this->getCachedFont();
     }
 
@@ -119,20 +178,14 @@ class CertificateService
         $cacheDir  = self::FONT_CACHE_DIR;
         $cachePath = $cacheDir . '/' . self::FONT_NAME;
 
-        // Limpiar caché antigua de DejaVu si existe
         $oldCache = $cacheDir . '/DejaVuSans-Bold.ttf';
-        if (file_exists($oldCache)) {
-            @unlink($oldCache);
-        }
+        if (file_exists($oldCache)) @unlink($oldCache);
 
-        // Usar caché existente válida
         if (file_exists($cachePath) && filesize($cachePath) > 10_000 && $this->isTtfValid($cachePath)) {
             return $cachePath;
         }
 
-        if (!is_dir($cacheDir)) {
-            @mkdir($cacheDir, 0755, true);
-        }
+        if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
 
         $context = stream_context_create([
             'http' => [
@@ -144,30 +197,22 @@ class CertificateService
             'ssl' => ['verify_peer' => false],
         ]);
 
-        // Intentar cada mirror hasta conseguir un TTF válido
         foreach (self::TTF_MIRRORS as $url) {
             $data = @file_get_contents($url, false, $context);
             if ($data === false || strlen($data) < 10_000) {
                 error_log('[RSGrup] Mirror fallido: ' . $url);
                 continue;
             }
-
-            // Verificar que es TTF antes de guardar
-            $header = substr($data, 0, 4);
-            if (strlen($header) < 4) continue;
-            $sfVersion = unpack('N', $header)[1];
+            $sfVersion = unpack('N', substr($data, 0, 4))[1];
             if (!in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true)) {
-                error_log('[RSGrup] Archivo no es TTF válido desde: ' . $url);
+                error_log('[RSGrup] No es TTF válido: ' . $url);
                 continue;
             }
-
             if (file_put_contents($cachePath, $data) !== false) {
-                error_log('[RSGrup] Fuente descargada OK desde: ' . $url);
                 return $cachePath;
             }
         }
 
-        error_log('[RSGrup] No se pudo descargar ninguna fuente TTF.');
         return null;
     }
 
@@ -182,7 +227,7 @@ class CertificateService
         return in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true);
     }
 
-    // ── Fallback bitmap (último recurso) ────────────────────────────
+    // ── Fallback bitmap ─────────────────────────────────────────────
 
     private function drawTextFallback(
         \GdImage $img, string $text, int $x, int $y, int $fontSize, int $textColor
@@ -199,12 +244,24 @@ class CertificateService
         $g = ($textColor >> 8)  & 0xFF;
         $b = $textColor & 0xFF;
         imagestring($tmp, 5, 2, 2, $text, imagecolorallocate($tmp, $r, $g, $b));
-        imagecopyresampled($img, $tmp, $x, $y - ($tmpH * $scale), 0, 0,
-            $tmpW * $scale, $tmpH * $scale, $tmpW, $tmpH);
+        imagecopyresampled(
+            $img, $tmp,
+            $x, $y - ($tmpH * $scale), 0, 0,
+            $tmpW * $scale, $tmpH * $scale, $tmpW, $tmpH
+        );
         imagedestroy($tmp);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
+
+    private function loadFpdf(): void
+    {
+        if (!class_exists('FPDF')) {
+            $fpdfPath = BASE_PATH . '/src/Helpers/fpdf.php';
+            if (function_exists('opcache_invalidate')) opcache_invalidate($fpdfPath, true);
+            require_once $fpdfPath;
+        }
+    }
 
     private function resolveBgPath(string $path): string
     {
@@ -220,14 +277,7 @@ class CertificateService
 
     private function outputPdf(\GdImage $img, string $fullName): void
     {
-        if (!class_exists('FPDF')) {
-            $fpdfPath = BASE_PATH . '/src/Helpers/fpdf.php';
-            if (function_exists('opcache_invalidate')) {
-                opcache_invalidate($fpdfPath, true);
-            }
-            require_once $fpdfPath;
-        }
-
+        $this->loadFpdf();
         $tmpImg = sys_get_temp_dir() . '/cert_' . uniqid() . '.png';
         imagepng($img, $tmpImg);
         $pdf = new \FPDF('L', 'mm', 'A4');
