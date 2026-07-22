@@ -25,6 +25,10 @@ try {
   var t = '';
   try { t = localStorage.getItem('rsgrup-theme') || ''; } catch(e) {}
   document.documentElement.setAttribute('data-theme', t || 'dark');
+  // Aplicar estado de sidebar colapsado en desktop (evita parpadeo)
+  var collapsed = false;
+  try { collapsed = localStorage.getItem('rsgrup-sidebar-collapsed') === '1'; } catch(e) {}
+  if (collapsed) document.documentElement.classList.add('sidebar-collapsed');
 })();
 </script>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
@@ -32,6 +36,191 @@ try {
   :root {
     --color-brand: <?= htmlspecialchars($accentColor) ?>;
     --color-brand-hover: color-mix(in srgb, <?= htmlspecialchars($accentColor) ?> 80%, #000);
+
+    --sidebar-w:           220px;
+    --sidebar-w-collapsed: 56px;
+  }
+
+  /* ── Layout base ──────────────────────────────────────── */
+  .admin-layout {
+    display: flex;
+    min-height: 100dvh;
+    overflow: hidden;   /* evitar scroll horizontal a nivel raíz */
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────── */
+  .admin-sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    transition: width 0.22s ease;
+    overflow: hidden;
+    position: relative;
+    z-index: 200;
+  }
+
+  /* Colapso en desktop */
+  .sidebar-collapsed .admin-sidebar {
+    width: var(--sidebar-w-collapsed);
+  }
+  .sidebar-collapsed .sidebar-link span,
+  .sidebar-collapsed .sidebar-logo img,
+  .sidebar-collapsed .sidebar-logo-text {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .sidebar-collapsed .sidebar-link {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .sidebar-collapsed .sidebar-icon {
+    margin: 0 auto;
+  }
+  .sidebar-collapsed .sidebar-logo {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  /* Botón toggle sidebar (desktop) */
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border, #333);
+    background: var(--color-surface, #1c1b19);
+    color: var(--color-text-muted, #aaa);
+    cursor: pointer;
+    position: absolute;
+    top: 14px;
+    right: -14px;
+    z-index: 210;
+    transition: background 0.18s, color 0.18s;
+    flex-shrink: 0;
+  }
+  .sidebar-toggle:hover {
+    background: var(--color-brand);
+    color: #fff;
+    border-color: var(--color-brand);
+  }
+  .sidebar-toggle svg {
+    transition: transform 0.22s ease;
+  }
+  .sidebar-collapsed .sidebar-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  /* ── Mobile: sidebar como drawer ──────────────────────── */
+  @media (max-width: 767px) {
+    .admin-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100dvh;
+      width: var(--sidebar-w) !important;  /* ignorar colapso en móvil */
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      z-index: 300;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+    }
+    .admin-sidebar.mobile-open {
+      transform: translateX(0);
+    }
+    .sidebar-toggle {
+      display: none; /* en móvil se usa el hamburger del topbar */
+    }
+    .sidebar-collapsed .sidebar-link span,
+    .sidebar-collapsed .sidebar-logo img,
+    .sidebar-collapsed .sidebar-logo-text {
+      opacity: 1;
+      pointer-events: auto;
+      width: auto;
+    }
+    .sidebar-collapsed .sidebar-link {
+      justify-content: flex-start;
+      padding-inline: revert;
+    }
+    .sidebar-collapsed .sidebar-icon {
+      margin: 0;
+    }
+
+    /* Overlay oscuro al abrir sidebar en móvil */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 299;
+    }
+    .sidebar-overlay.visible {
+      display: block;
+    }
+  }
+
+  /* ── Admin-main: ocupa el resto del espacio ───────────── */
+  .admin-main {
+    flex: 1;
+    min-width: 0;           /* crucial: permite que flex child se encoja */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Topbar ────────────────────────────────────────────── */
+  .admin-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  /* Botón hamburger (solo móvil) */
+  .btn-hamburger {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted, #aaa);
+    cursor: pointer;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .btn-hamburger:hover { background: var(--color-surface-offset, #2a2928); }
+  @media (max-width: 767px) {
+    .btn-hamburger { display: flex; }
+  }
+
+  /* ── Contenido: scroll horizontal en tablas ───────────── */
+  .admin-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  /* Tablas y wrappers anchos pueden hacer scroll horizontal */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Aplicar automáticamente a todas las tablas dentro de admin-content */
+  .admin-content table {
+    min-width: 480px; /* evita que colapsen demasiado */
+  }
+  /* Envuelve las tablas que no tengan .table-responsive con scroll */
+  .admin-content > * {
+    /* los hijos directos pueden desbordarse; el contenedor hace scroll */
+  }
+  /* Wrapper general de páginas admin que no usan .table-responsive explícito */
+  .admin-page {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2rem;
   }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,8 +229,16 @@ try {
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
+<!-- Overlay móvil -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
 <div class="admin-layout">
-  <aside class="admin-sidebar">
+  <aside class="admin-sidebar" id="admin-sidebar">
+    <!-- Botón colapsar (desktop) -->
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Colapsar menú">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+
     <div class="sidebar-logo">
       <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="RSGrup" height="48">
     </div>
@@ -61,7 +258,7 @@ try {
       ?>
       <a href="<?= BASE_URL . $l['href'] ?>" class="sidebar-link <?= $active ?>">
         <i data-lucide="<?= $l['icon'] ?>" class="sidebar-icon"></i>
-        <?= $l['label'] ?>
+        <span><?= $l['label'] ?></span>
       </a>
       <?php endforeach; ?>
     </nav>
@@ -70,7 +267,7 @@ try {
         <?= \Csrf::field() ?>
         <button type="submit" class="sidebar-link w-full" style="border:none;cursor:pointer;background:transparent;">
           <i data-lucide="log-out" class="sidebar-icon"></i>
-          Cerrar sesión
+          <span>Cerrar sesión</span>
         </button>
       </form>
     </div>
@@ -78,6 +275,11 @@ try {
 
   <div class="admin-main">
     <header class="admin-topbar">
+      <!-- Hamburger (móvil) -->
+      <button class="btn-hamburger" id="btn-hamburger" aria-label="Abrir menú">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
       <?php if ($currentUri !== '/admin' && $currentUri !== '/admin/'): ?>
         <a href="javascript:history.back()" class="btn-back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>

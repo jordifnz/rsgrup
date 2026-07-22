@@ -33,6 +33,44 @@
     applyTheme((html.getAttribute('data-theme')||'dark')==='dark' ? 'light' : 'dark');
   });
 
+  // ── Sidebar colapso (desktop) ──────────────────────────
+  var toggleBtn = document.getElementById('sidebar-toggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function(){
+      var collapsed = html.classList.toggle('sidebar-collapsed');
+      try { localStorage.setItem('rsgrup-sidebar-collapsed', collapsed ? '1' : '0'); } catch(e) {}
+    });
+  }
+
+  // ── Sidebar drawer (móvil) ─────────────────────────────
+  var hamburger = document.getElementById('btn-hamburger');
+  var sidebar   = document.getElementById('admin-sidebar');
+  var overlay   = document.getElementById('sidebar-overlay');
+
+  function openMobileSidebar() {
+    if (sidebar)  sidebar.classList.add('mobile-open');
+    if (overlay)  overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeMobileSidebar() {
+    if (sidebar)  sidebar.classList.remove('mobile-open');
+    if (overlay)  overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+  }
+
+  if (hamburger) hamburger.addEventListener('click', openMobileSidebar);
+  if (overlay)   overlay.addEventListener('click',   closeMobileSidebar);
+
+  // Cerrar sidebar móvil al navegar
+  if (sidebar) {
+    sidebar.querySelectorAll('.sidebar-link').forEach(function(link) {
+      link.addEventListener('click', function(){
+        if (window.innerWidth < 768) closeMobileSidebar();
+      });
+    });
+  }
+
+  // ── Iconos Lucide + flash messages ────────────────────
   document.addEventListener('DOMContentLoaded', function(){
     if (typeof lucide !== 'undefined') lucide.createIcons();
     document.querySelectorAll('.flash').forEach(function(el){
