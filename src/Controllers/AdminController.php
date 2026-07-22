@@ -9,15 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ─────────────────────────────────────────────────────
-class AdminController
-{
-    private function boot(): void
-    {
-        requireLogin();
-        requireAdmin();
-    }
-
+    // ── Dashboard ─────────────────────────────────────��───────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -27,13 +19,17 @@ class AdminController
             'exams_done'  => Database::fetchColumn('SELECT COUNT(*) FROM rsgrup_exam_attempts'),
             'courses'     => Database::fetchColumn('SELECT COUNT(*) FROM rsgrup_courses'),
         ];
-        $recentActivity = Database::fetchAll('SELECT al.*, u.name, u.email FROM rsgrup_activity_log al LEFT JOIN rsgrup_users u ON u.id=al.user_id ORDER BY al.created_at DESC LIMIT 10');
+        $recentActivity = Database::fetchAll(
+            'SELECT al.*, u.name, u.email FROM rsgrup_activity_log al
+             LEFT JOIN rsgrup_users u ON u.id=al.user_id
+             ORDER BY al.created_at DESC LIMIT 10'
+        );
         $metaTitle = 'Admin Dashboard';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ─────────────────────────────────────────────────
+    // ── Courses ──────────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -47,49 +43,56 @@ class AdminController
     {
         $this->boot();
         Csrf::verify();
-        $id    = Sanitize::int($_POST['id'] ?? 0);
-        $title = Sanitize::string($_POST['title'] ?? '');
-        $desc  = Sanitize::html($_POST['description'] ?? '');
-        $slug  = Sanitize::slug($title);
+        $id     = Sanitize::int($_POST['id'] ?? 0);
+        $title  = Sanitize::string($_POST['title'] ?? '');
+        $desc   = Sanitize::html($_POST['description'] ?? '');
+        $slug   = Sanitize::slug($title);
         $active = isset($_POST['active']) ? 1 : 0;
         if ($id) {
-            Database::execute('UPDATE rsgrup_courses SET title=?,description=?,slug=?,active=?,updated_at=NOW() WHERE id=?', [$title,$desc,$slug,$active,$id]);
+            Database::execute(
+                'UPDATE rsgrup_courses SET title=?,description=?,slug=?,active=?,updated_at=NOW() WHERE id=?',
+                [$title, $desc, $slug, $active, $id]
+            );
         } else {
-            Database::execute('INSERT INTO rsgrup_courses (title,description,slug,active,created_at,updated_at) VALUES (?,?,?,?,NOW(),NOW())', [$title,$desc,$slug,$active]);
+            Database::execute(
+                'INSERT INTO rsgrup_courses (title,description,slug,active,created_at,updated_at) VALUES (?,?,?,?,NOW(),NOW())',
+                [$title, $desc, $slug, $active]
+            );
         }
         ActivityLogger::log($_SESSION['user_id'], 'course_saved', "Curso: {$title}");
-        header('Location: '.BASE_URL.'/admin/cursos'); exit;
+        header('Location: ' . BASE_URL . '/admin/cursos');
+        exit;
     }
 
-    // ── Deliveries (nivel inscripción) ─────────────────────────────
+    // ── Entregas (nivel inscripción alumno) ──────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
         $deliveries = Database::fetchAll(
-            'SELECT d.*, c.title AS course_title,
-                    COUNT(DISTINCT dt.topic_id) AS topic_count,
-                    COUNT(DISTINCT en.id) AS enrolled_count
+            'SELECT d.*,
+                    c.title                    AS course_title,
+                    COUNT(DISTINCT t.id)       AS topic_count,
+                    COUNT(DISTINCT en.id)      AS enrolled_count
              FROM rsgrup_deliveries d
-             LEFT JOIN rsgrup_courses c ON c.id = d.course_id
-             LEFT JOIN rsgrup_delivery_topics dt ON dt.delivery_id = d.id
+             LEFT JOIN rsgrup_courses     c  ON c.id  = d.course_id
+             LEFT JOIN rsgrup_topics      t  ON t.delivery_id = d.id
              LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.status = "active"
              GROUP BY d.id
              ORDER BY d.sort_order ASC'
         );
-        $courses = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
-        $topics  = TopicModel::getAll();
+        $courses   = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
         $metaTitle = 'Entregas';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/deliveries.php';
     }
 
-    /** AJAX: inscritos de una entrega */
     public function deliveryEnrolled(array $params = []): void
     {
         $this->boot();
         $deliveryId = Sanitize::int($params['id'] ?? 0);
         $rows = Database::fetchAll(
-            'SELECT en.id AS enrollment_id, en.status, DATE_FORMAT(en.created_at,\'%d/%m/%Y\') AS enrolled_at,
+            'SELECT en.id AS enrollment_id, en.status,
+                    DATE_FORMAT(en.created_at,\'%d/%m/%Y\') AS enrolled_at,
                     u.id AS user_id, u.name, u.surnames, u.email
              FROM rsgrup_enrollments en
              JOIN rsgrup_users u ON u.id = en.user_id
@@ -109,12 +112,14 @@ class AdminController
         $deliveryId   = Sanitize::int($params['id']            ?? 0);
         $enrollmentId = Sanitize::int($params['enrollment_id'] ?? 0);
         Database::execute(
-            'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND delivery_id=?',
+            "UPDATE rsgrup_enrollments SET status='cancelled' WHERE id=? AND delivery_id=?",
             [$enrollmentId, $deliveryId]
         );
-        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} entrega ID:{$deliveryId}");
+        ActivityLogger::log($_SESSION['user_id'], 'unenroll',
+            "Baja inscripción ID:{$enrollmentId} entrega ID:{$deliveryId}");
         $_SESSION['flash_success'] = 'Alumno dado de baja correctamente.';
-        header('Location: '.BASE_URL.'/admin/entregas'); exit;
+        header('Location: ' . BASE_URL . '/admin/entregas');
+        exit;
     }
 
     public function saveDelivery(array $params = []): void
@@ -125,44 +130,39 @@ class AdminController
         $courseId    = Sanitize::int($_POST['course_id'] ?? 0);
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
-        $type        = in_array($_POST['type']??'', ['matricula','entrega','practica']) ? $_POST['type'] : 'entrega';
+        $type        = in_array($_POST['type'] ?? '', ['matricula', 'entrega', 'practica'])
+                           ? $_POST['type'] : 'entrega';
         $price       = Sanitize::float($_POST['price'] ?? 0);
-        $paymentType = ($_POST['payment_type']??'online') === 'presencial' ? 'presencial' : 'online';
+        $paymentType = ($_POST['payment_type'] ?? 'online') === 'presencial' ? 'presencial' : 'online';
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
-        $notifyEmail = isset($_POST['notify_email']) ? 1 : 0;
+        $notifyEmail = isset($_POST['notify_email'])    ? 1 : 0;
         $notifyWa    = isset($_POST['notify_whatsapp']) ? 1 : 0;
         $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        $fields = [$courseId,$title,$description,$slug,$type,$price,$paymentType,$sortOrder,$notifyEmail,$notifyWa,$active];
+        $fields = [$courseId, $title, $description, $slug, $type, $price,
+                   $paymentType, $sortOrder, $notifyEmail, $notifyWa, $active];
         if ($id) {
             Database::execute(
-                'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,sort_order=?,notify_email=?,notify_whatsapp=?,active=?,updated_at=NOW() WHERE id=?',
+                'UPDATE rsgrup_deliveries
+                 SET course_id=?,title=?,description=?,slug=?,type=?,price=?,
+                     payment_type=?,sort_order=?,notify_email=?,notify_whatsapp=?,active=?,
+                     updated_at=NOW()
+                 WHERE id=?',
                 array_merge($fields, [$id])
             );
-            // Actualizar temas vinculados
-            Database::execute('DELETE FROM rsgrup_delivery_topics WHERE delivery_id=?', [$id]);
         } else {
             Database::execute(
-                'INSERT INTO rsgrup_deliveries (course_id,title,description,slug,type,price,payment_type,sort_order,notify_email,notify_whatsapp,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
+                'INSERT INTO rsgrup_deliveries
+                     (course_id,title,description,slug,type,price,payment_type,
+                      sort_order,notify_email,notify_whatsapp,active,created_at,updated_at)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
                 $fields
             );
-            $id = (int)Database::lastInsertId();
-        }
-        // Vincular temas seleccionados
-        $topicIds = isset($_POST['topic_ids']) && is_array($_POST['topic_ids'])
-            ? array_map('intval', $_POST['topic_ids'])
-            : [];
-        foreach ($topicIds as $order => $topicId) {
-            if ($topicId > 0) {
-                Database::execute(
-                    'INSERT IGNORE INTO rsgrup_delivery_topics (delivery_id, topic_id, sort_order) VALUES (?,?,?)',
-                    [$id, $topicId, $order]
-                );
-            }
         }
         ActivityLogger::log($_SESSION['user_id'], 'delivery_saved', "Entrega: {$title}");
-        header('Location: '.BASE_URL.'/admin/entregas'); exit;
+        header('Location: ' . BASE_URL . '/admin/entregas');
+        exit;
     }
 
     public function deleteDelivery(array $params = []): void
@@ -172,18 +172,27 @@ class AdminController
         $id = Sanitize::int($params['id'] ?? 0);
         Database::execute('DELETE FROM rsgrup_deliveries WHERE id=?', [$id]);
         ActivityLogger::log($_SESSION['user_id'], 'delivery_deleted', "Entrega ID: {$id}");
-        header('Location: '.BASE_URL.'/admin/entregas'); exit;
+        header('Location: ' . BASE_URL . '/admin/entregas');
+        exit;
     }
 
-    // ── Topics (ex-Entregas) ───────────────────────────────────────
+    // ── Temas (ex-Entregas) ─────────────────────────────────────────
     public function topics(array $params = []): void
     {
         $this->boot();
-        $topics    = TopicModel::getAllAdmin();
-        $courses   = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
-        $exams     = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
-        $metaTitle = 'Temas';
-        $robots    = 'noindex,nofollow';
+        $topics     = Database::fetchAll(
+            'SELECT t.*,
+                    d.title AS delivery_title,
+                    e.title AS exam_title
+             FROM rsgrup_topics t
+             LEFT JOIN rsgrup_deliveries d ON d.id = t.delivery_id
+             LEFT JOIN rsgrup_exams      e ON e.id = t.exam_id
+             ORDER BY t.delivery_id ASC, t.sort_order ASC, t.id ASC'
+        );
+        $deliveries = Database::fetchAll('SELECT id, title FROM rsgrup_deliveries ORDER BY sort_order');
+        $exams      = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
+        $metaTitle  = 'Temas';
+        $robots     = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/topics.php';
     }
 
@@ -206,15 +215,15 @@ class AdminController
         $this->boot();
         Csrf::verify();
         $id          = Sanitize::int($_POST['id'] ?? 0);
-        $courseId    = Sanitize::int($_POST['course_id'] ?? 0);
+        $deliveryId  = Sanitize::int($_POST['delivery_id'] ?? 0);
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
         $examId      = Sanitize::int($_POST['exam_id'] ?? 0) ?: null;
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
-        $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        $pdfFile = $_POST['existing_pdf'] ?? null;
+        // PDF upload
+        $pdfFile = $id ? (Database::fetchColumn('SELECT pdf_file FROM rsgrup_topics WHERE id=?', [$id]) ?: null) : null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
             if ($ext === 'pdf') {
@@ -226,20 +235,30 @@ class AdminController
             }
         }
 
-        $fields = [$courseId,$title,$description,$slug,$examId,$sortOrder,$pdfFile,$active];
         if ($id) {
-            Database::execute(
-                'UPDATE rsgrup_topics SET course_id=?,title=?,description=?,slug=?,exam_id=?,sort_order=?,pdf_file=?,active=?,updated_at=NOW() WHERE id=?',
-                array_merge($fields, [$id])
-            );
+            TopicModel::update($id, [
+                'delivery_id'  => $deliveryId,
+                'exam_id'      => $examId,
+                'title'        => $title,
+                'description'  => $description,
+                'pdf_file'     => $pdfFile,
+                'sort_order'   => $sortOrder,
+                'active'       => $active,
+            ]);
         } else {
-            Database::execute(
-                'INSERT INTO rsgrup_topics (course_id,title,description,slug,exam_id,sort_order,pdf_file,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())',
-                $fields
-            );
+            TopicModel::create([
+                'delivery_id'  => $deliveryId,
+                'exam_id'      => $examId,
+                'title'        => $title,
+                'description'  => $description,
+                'pdf_file'     => $pdfFile,
+                'sort_order'   => $sortOrder,
+                'active'       => $active,
+            ]);
         }
         ActivityLogger::log($_SESSION['user_id'], 'topic_saved', "Tema: {$title}");
-        header('Location: '.BASE_URL.'/admin/temas'); exit;
+        header('Location: ' . BASE_URL . '/admin/temas');
+        exit;
     }
 
     public function deleteTopic(array $params = []): void
@@ -247,23 +266,24 @@ class AdminController
         $this->boot();
         Csrf::verify();
         $id = Sanitize::int($params['id'] ?? 0);
-        Database::execute('DELETE FROM rsgrup_topics WHERE id=?', [$id]);
+        TopicModel::delete($id);
         ActivityLogger::log($_SESSION['user_id'], 'topic_deleted', "Tema ID: {$id}");
-        header('Location: '.BASE_URL.'/admin/temas'); exit;
+        header('Location: ' . BASE_URL . '/admin/temas');
+        exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────────────
+    // ── Exams ───────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
         $exams = Database::fetchAll(
             'SELECT e.*,
                     t.title AS topic_title,
-                    COUNT(q.id) AS question_count
+                    COUNT(DISTINCT q.id) AS question_count
              FROM rsgrup_exams e
-             LEFT JOIN rsgrup_topics t         ON t.exam_id = e.id
-             LEFT JOIN rsgrup_exam_questions q ON q.exam_id = e.id
-             GROUP BY e.id, t.title
+             LEFT JOIN rsgrup_topics          t ON t.exam_id = e.id
+             LEFT JOIN rsgrup_exam_questions  q ON q.exam_id = e.id
+             GROUP BY e.id
              ORDER BY e.id DESC'
         );
         $metaTitle = 'Exámenes';
@@ -276,7 +296,13 @@ class AdminController
         $this->boot();
         $id     = Sanitize::int($params['id'] ?? 0);
         $exam   = $id ? ExamModel::findWithQuestions($id) : null;
-        $topics = Database::fetchAll('SELECT id, title FROM rsgrup_topics WHERE active=1 ORDER BY sort_order');
+        $topics = Database::fetchAll(
+            'SELECT t.id, CONCAT(d.title, " — ", t.title) AS title
+             FROM rsgrup_topics t
+             JOIN rsgrup_deliveries d ON d.id = t.delivery_id
+             WHERE t.active = 1
+             ORDER BY d.sort_order, t.sort_order'
+        );
         $metaTitle = $id ? 'Editar Exámen' : 'Nuevo Exámen';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/exam_edit.php';
@@ -291,11 +317,18 @@ class AdminController
         $description = Sanitize::html($_POST['description'] ?? '');
         $topicId     = Sanitize::int($_POST['topic_id'] ?? 0) ?: null;
         if ($id) {
-            Database::execute('UPDATE rsgrup_exams SET title=?,description=?,updated_at=NOW() WHERE id=?', [$title,$description,$id]);
+            Database::execute(
+                'UPDATE rsgrup_exams SET title=?,description=?,updated_at=NOW() WHERE id=?',
+                [$title, $description, $id]
+            );
         } else {
-            Database::execute('INSERT INTO rsgrup_exams (title,description,created_at,updated_at) VALUES (?,?,NOW(),NOW())', [$title,$description]);
+            Database::execute(
+                'INSERT INTO rsgrup_exams (title,description,created_at,updated_at) VALUES (?,?,NOW(),NOW())',
+                [$title, $description]
+            );
             $id = (int) Database::lastInsertId();
         }
+        // Vincular examen al tema seleccionado
         if ($topicId) {
             Database::execute('UPDATE rsgrup_topics SET exam_id=? WHERE id=?', [$id, $topicId]);
         }
@@ -303,7 +336,8 @@ class AdminController
             ExamModel::saveQuestions($id, $_POST['questions']);
         }
         ActivityLogger::log($_SESSION['user_id'], 'exam_saved', "Exámen: {$title}");
-        header('Location: '.BASE_URL.'/admin/examenes'); exit;
+        header('Location: ' . BASE_URL . '/admin/examenes');
+        exit;
     }
 
     public function deleteExam(array $params = []): void
@@ -313,21 +347,22 @@ class AdminController
         $id = Sanitize::int($params['id'] ?? 0);
         Database::execute('DELETE FROM rsgrup_exams WHERE id=?', [$id]);
         ActivityLogger::log($_SESSION['user_id'], 'exam_deleted', "Exámen ID: {$id}");
-        header('Location: '.BASE_URL.'/admin/examenes'); exit;
+        header('Location: ' . BASE_URL . '/admin/examenes');
+        exit;
     }
 
-    // ── Users ─────────────────────────────────────────────────────
+    // ── Users ────────────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
         $search = Sanitize::string($_GET['search'] ?? '');
-        $role   = in_array($_GET['role'] ?? '', ['alumno','admin']) ? $_GET['role'] : '';
+        $role   = in_array($_GET['role'] ?? '', ['alumno', 'admin']) ? $_GET['role'] : '';
         $where  = 'WHERE 1=1';
         $bind   = [];
         if ($search) {
             $where .= ' AND (u.name LIKE ? OR u.surnames LIKE ? OR u.email LIKE ?)';
-            $s = "%{$search}%";
-            $bind = array_merge($bind, [$s, $s, $s]);
+            $s      = "%{$search}%";
+            $bind   = array_merge($bind, [$s, $s, $s]);
         }
         if ($role) { $where .= ' AND u.role=?'; $bind[] = $role; }
         $sql = "SELECT u.*,
@@ -350,15 +385,22 @@ class AdminController
         $this->boot();
         $id   = Sanitize::int($params['id'] ?? 0);
         $user = UserModel::findById($id);
-        if (!$user) { http_response_code(404); include BASE_PATH.'/public/404.php'; return; }
+        if (!$user) {
+            http_response_code(404);
+            include BASE_PATH . '/public/404.php';
+            return;
+        }
         $enrollments = Database::fetchAll(
             'SELECT en.*, d.title, d.type FROM rsgrup_enrollments en
              JOIN rsgrup_deliveries d ON d.id = en.delivery_id
              WHERE en.user_id=? ORDER BY en.created_at DESC',
             [$id]
         );
-        $logs      = Database::fetchAll('SELECT * FROM rsgrup_activity_log WHERE user_id=? ORDER BY created_at DESC LIMIT 50', [$id]);
-        $metaTitle = 'Usuario: '.htmlspecialchars($user['name']);
+        $logs      = Database::fetchAll(
+            'SELECT * FROM rsgrup_activity_log WHERE user_id=? ORDER BY created_at DESC LIMIT 50',
+            [$id]
+        );
+        $metaTitle = 'Usuario: ' . htmlspecialchars($user['name']);
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/user_detail.php';
     }
@@ -370,12 +412,14 @@ class AdminController
         $userId       = Sanitize::int($params['id']            ?? 0);
         $enrollmentId = Sanitize::int($params['enrollment_id'] ?? 0);
         Database::execute(
-            'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND user_id=?',
+            "UPDATE rsgrup_enrollments SET status='cancelled' WHERE id=? AND user_id=?",
             [$enrollmentId, $userId]
         );
-        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} usuario ID:{$userId}");
+        ActivityLogger::log($_SESSION['user_id'], 'unenroll',
+            "Baja inscripción ID:{$enrollmentId} usuario ID:{$userId}");
         $_SESSION['flash_success'] = 'Inscripción cancelada correctamente.';
-        header('Location: '.BASE_URL.'/admin/usuarios/'.$userId); exit;
+        header('Location: ' . BASE_URL . '/admin/usuarios/' . $userId);
+        exit;
     }
 
     public function saveUser(array $params = []): void
@@ -384,17 +428,17 @@ class AdminController
         Csrf::verify();
         $id   = Sanitize::int($_POST['id'] ?? 0);
         $data = [
-            'name'        => Sanitize::string($_POST['name'] ?? ''),
-            'surnames'    => Sanitize::string($_POST['surnames'] ?? ''),
-            'email'       => Sanitize::email($_POST['email'] ?? ''),
-            'phone'       => Sanitize::string($_POST['phone'] ?? '', 20),
-            'address'     => Sanitize::string($_POST['address'] ?? ''),
+            'name'        => Sanitize::string($_POST['name']        ?? ''),
+            'surnames'    => Sanitize::string($_POST['surnames']    ?? ''),
+            'email'       => Sanitize::email($_POST['email']        ?? ''),
+            'phone'       => Sanitize::string($_POST['phone']       ?? '', 20),
+            'address'     => Sanitize::string($_POST['address']     ?? ''),
             'postal_code' => Sanitize::string($_POST['postal_code'] ?? '', 10),
-            'city'        => Sanitize::string($_POST['city'] ?? ''),
-            'province'    => Sanitize::string($_POST['province'] ?? ''),
-            'instagram'   => Sanitize::string($_POST['instagram'] ?? '', 100),
-            'tiktok'      => Sanitize::string($_POST['tiktok'] ?? '', 100),
-            'role'        => in_array($_POST['role']??'', ['alumno','admin']) ? $_POST['role'] : 'alumno',
+            'city'        => Sanitize::string($_POST['city']        ?? ''),
+            'province'    => Sanitize::string($_POST['province']    ?? ''),
+            'instagram'   => Sanitize::string($_POST['instagram']   ?? '', 100),
+            'tiktok'      => Sanitize::string($_POST['tiktok']      ?? '', 100),
+            'role'        => in_array($_POST['role'] ?? '', ['alumno', 'admin']) ? $_POST['role'] : 'alumno',
         ];
         $pass = $_POST['password'] ?? '';
         if ($pass) $data['password'] = $pass;
@@ -404,25 +448,30 @@ class AdminController
             $id = UserModel::create($data);
         }
         ActivityLogger::log($_SESSION['user_id'], 'user_saved', "Usuario ID: {$id}");
-        header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
+        header('Location: ' . BASE_URL . '/admin/usuarios/' . $id);
+        exit;
     }
 
-    // ── Activity ───────────────────────────────────────────────
+    // ── Activity ─────────────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
-        $logs      = Database::fetchAll('SELECT al.*, u.name, u.email FROM rsgrup_activity_log al LEFT JOIN rsgrup_users u ON u.id=al.user_id ORDER BY al.created_at DESC LIMIT 200');
+        $logs = Database::fetchAll(
+            'SELECT al.*, u.name, u.email FROM rsgrup_activity_log al
+             LEFT JOIN rsgrup_users u ON u.id=al.user_id
+             ORDER BY al.created_at DESC LIMIT 200'
+        );
         $metaTitle = 'Actividad';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ───────────────────────────────────────────────
+    // ── Settings ─────────────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
-        $settings  = Database::fetchAll('SELECT `key`, `value` FROM rsgrup_settings');
-        $s         = [];
+        $settings = Database::fetchAll('SELECT `key`, `value` FROM rsgrup_settings');
+        $s        = [];
         foreach ($settings as $row) $s[$row['key']] = $row['value'];
         $apiTokens = Database::fetchAll('SELECT * FROM rsgrup_api_tokens ORDER BY created_at DESC');
         $metaTitle = 'Ajustes';
@@ -436,7 +485,7 @@ class AdminController
         Csrf::verify();
         if (!empty($_FILES['cert_bg']['tmp_name']) && $_FILES['cert_bg']['error'] === UPLOAD_ERR_OK) {
             $ext = strtolower(pathinfo($_FILES['cert_bg']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['png','jpg','jpeg'])) {
+            if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
                 $uploadDir = BASE_PATH . '/public/uploads/certificates/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 $filename = 'background.' . $ext;
@@ -454,10 +503,11 @@ class AdminController
                 }
             }
         }
-        $examSchedule = in_array($_POST['exam_schedule'] ?? '', ['last_saturday','always','custom_days'])
+        $examSchedule = in_array($_POST['exam_schedule'] ?? '',
+            ['last_saturday', 'always', 'custom_days'])
             ? $_POST['exam_schedule'] : 'last_saturday';
         $_POST['exam_schedule'] = $examSchedule;
-        $rawDays = isset($_POST['exam_custom_days']) && is_array($_POST['exam_custom_days'])
+        $rawDays   = isset($_POST['exam_custom_days']) && is_array($_POST['exam_custom_days'])
             ? $_POST['exam_custom_days'] : [];
         $validDays = array_values(array_unique(
             array_filter(array_map('intval', $rawDays), fn($d) => $d >= 0 && $d <= 6)
@@ -483,20 +533,26 @@ class AdminController
         }
         ActivityLogger::log($_SESSION['user_id'], 'settings_saved', 'Ajustes guardados');
         $_SESSION['flash_success'] = 'Ajustes guardados correctamente.';
-        header('Location: '.BASE_URL.'/admin/settings'); exit;
+        header('Location: ' . BASE_URL . '/admin/settings');
+        exit;
     }
 
-    // ── API Tokens ───────────────────────────────────────────────
+    // ── API Tokens ───────────────────────────────────────────────────
     public function createApiToken(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
         $label = Sanitize::string($_POST['label'] ?? 'Token');
         $token = bin2hex(random_bytes(32));
-        Database::execute('INSERT INTO rsgrup_api_tokens (label, token, created_at) VALUES (?, ?, NOW())', [$label, $token]);
+        Database::execute(
+            'INSERT INTO rsgrup_api_tokens (label, token, created_at) VALUES (?, ?, NOW())',
+            [$label, $token]
+        );
         ActivityLogger::log($_SESSION['user_id'], 'token_created', "Token: {$label}");
-        $_SESSION['flash_success'] = 'Token generado: ' . $token . ' — Cópialo ahora, no se mostrará de nuevo.';
-        header('Location: '.BASE_URL.'/admin/settings'); exit;
+        $_SESSION['flash_success'] =
+            'Token generado: ' . $token . ' — Cópialo ahora, no se mostrará de nuevo.';
+        header('Location: ' . BASE_URL . '/admin/settings');
+        exit;
     }
 
     public function deleteApiToken(array $params = []): void
@@ -507,14 +563,14 @@ class AdminController
         Database::execute('DELETE FROM rsgrup_api_tokens WHERE id=?', [$id]);
         ActivityLogger::log($_SESSION['user_id'], 'token_deleted', "Token ID: {$id}");
         $_SESSION['flash_success'] = 'Token eliminado.';
-        header('Location: '.BASE_URL.'/admin/settings'); exit;
+        header('Location: ' . BASE_URL . '/admin/settings');
+        exit;
     }
 
-    // Alias para compatibilidad con rutas antiguas
     public function createToken(array $params = []): void { $this->createApiToken($params); }
     public function deleteToken(array $params = []): void  { $this->deleteApiToken($params); }
 
-    // ── Títulos: impresión masiva ───────────────────────────��──────
+    // ── Títulos: impresión masiva ──────────────────────────────────────
     public function titlesBulk(array $params = []): void
     {
         $this->boot();
@@ -568,8 +624,9 @@ class AdminController
                           )
                 )
         ";
-        $totalRows = (int)Database::fetchColumn("SELECT COUNT(*) FROM ({$baseSql}) sub");
-        $rows      = Database::fetchAll("{$baseSql} ORDER BY enrolled_at DESC LIMIT ? OFFSET ?", [$perPage, $offset]);
+        $totalRows    = (int) Database::fetchColumn("SELECT COUNT(*) FROM ({$baseSql}) sub");
+        $rows         = Database::fetchAll("{$baseSql} ORDER BY enrolled_at DESC LIMIT ? OFFSET ?",
+                             [$perPage, $offset]);
         $passingScore = ExamModel::passingScore();
         $metaTitle    = 'Impresión masiva de títulos';
         $robots       = 'noindex,nofollow';
@@ -580,16 +637,18 @@ class AdminController
     {
         $this->boot();
         Csrf::verify();
-        $rawIds = isset($_POST['bulk_keys']) && is_array($_POST['bulk_keys']) ? $_POST['bulk_keys'] : [];
+        $rawIds = isset($_POST['bulk_keys']) && is_array($_POST['bulk_keys'])
+            ? $_POST['bulk_keys'] : [];
         if (empty($rawIds)) {
             $_SESSION['flash_error'] = 'No se seleccionó ningún alumno.';
-            header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
+            header('Location: ' . BASE_URL . '/admin/titulos-masivos');
+            exit;
         }
         $rows = [];
         foreach ($rawIds as $key) {
             [$userId, $courseId] = array_map('intval', explode('_', $key));
             if (!$userId || !$courseId) continue;
-            $row = Database::fetchOne(
+            $row = Database::fetch(
                 "SELECT u.name, u.surnames, u.email,
                         c.title AS delivery_title,
                         DATE_FORMAT(
@@ -610,7 +669,8 @@ class AdminController
         }
         if (empty($rows)) {
             $_SESSION['flash_error'] = 'No se encontraron datos válidos.';
-            header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
+            header('Location: ' . BASE_URL . '/admin/titulos-masivos');
+            exit;
         }
         $pdfContent = CertificateService::generateBulk($rows);
         header('Content-Type: application/pdf');
