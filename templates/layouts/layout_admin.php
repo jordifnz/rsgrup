@@ -17,7 +17,112 @@ $baseUrl   = BASE_URL;
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
+  <style>
+    /* ── Sidebar colapsado (iconos solos) ───────────────────────── */
+    .admin-sidebar {
+      width: 220px;
+      transition: width 200ms ease;
+    }
+    .admin-sidebar.collapsed {
+      width: 54px;
+    }
+    /* Iconos: siempre visibles y de tamaño fijo */
+    .sidebar-link svg,
+    .sidebar-link i {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      flex-shrink: 0;
+    }
+    /* Texto: se oculta al colapsar */
+    .admin-sidebar.collapsed .sidebar-link span {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      display: inline-block;
+      transition: opacity 150ms ease, width 150ms ease;
+    }
+    .admin-sidebar:not(.collapsed) .sidebar-link span {
+      opacity: 1;
+      width: auto;
+      transition: opacity 200ms ease;
+    }
+    /* Centrar icono cuando está colapsado */
+    .admin-sidebar.collapsed .sidebar-link {
+      justify-content: center;
+      padding: 0.625rem;
+      gap: 0;
+    }
+    /* Logo: ocultar al colapsar */
+    .admin-sidebar.collapsed .sidebar-logo img {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* Tooltip al hover en modo colapsado */
+    .admin-sidebar.collapsed .sidebar-link {
+      position: relative;
+    }
+    .admin-sidebar.collapsed .sidebar-link:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,.85);
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 500;
+      padding: .25rem .6rem;
+      border-radius: .35rem;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    /* Botón toggle del sidebar */
+    .sidebar-collapse-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: .5rem;
+      background: none;
+      border: none;
+      border-top: 1px solid rgba(255,255,255,.06);
+      color: var(--color-sidebar-text, #cdccca);
+      cursor: pointer;
+      transition: background 150ms;
+    }
+    .sidebar-collapse-btn:hover {
+      background: rgba(255,255,255,.06);
+    }
+    /* En móvil, empieza colapsado */
+    @media (max-width: 768px) {
+      .admin-sidebar { width: 54px; }
+      .admin-sidebar .sidebar-link span { opacity: 0; width: 0; overflow: hidden; display: inline-block; }
+      .admin-sidebar .sidebar-link { justify-content: center; padding: .625rem; gap: 0; }
+      .admin-sidebar .sidebar-logo img { opacity: 0; pointer-events: none; }
+    }
+  </style>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script>
+    // Inicializar Lucide después de cargar
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+    // Sidebar collapse toggle
+    function toggleSidebar() {
+      var sb = document.getElementById('admin-sidebar');
+      if (!sb) return;
+      sb.classList.toggle('collapsed');
+      var btn = document.getElementById('sidebar-collapse-btn');
+      if (btn) {
+        var isCollapsed = sb.classList.contains('collapsed');
+        btn.setAttribute('aria-label', isCollapsed ? 'Expandir menú' : 'Colapsar menú');
+        btn.querySelector('svg') && btn.querySelector('svg').remove();
+        // el icono lo actualiza lucide en el siguiente tick
+      }
+    }
+  </script>
 </head>
 <body class="admin-layout">
   <a class="sr-only" href="#admin-main">Saltar al contenido</a>
@@ -28,31 +133,53 @@ $baseUrl   = BASE_URL;
       <img src="<?= BASE_URL ?>/assets/img/logo.png" alt="<?= APP_NAME ?>" width="160" height="80" loading="lazy">
     </div>
     <nav class="sidebar-nav" aria-label="Navegación admin">
-      <a href="<?= BASE_URL ?>/admin" class="sidebar-link <?= str_ends_with($_SERVER['REQUEST_URI'],'/admin') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin"
+         class="sidebar-link <?= str_ends_with($_SERVER['REQUEST_URI'],'/admin') ? 'active' : '' ?>"
+         data-tooltip="Dashboard">
         <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/cursos" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/cursos') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin/cursos"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/cursos') ? 'active' : '' ?>"
+         data-tooltip="Cursos">
         <i data-lucide="book-open"></i> <span>Cursos</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/entregas" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/entregas') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin/entregas"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/entregas') ? 'active' : '' ?>"
+         data-tooltip="Entregas">
         <i data-lucide="layers"></i> <span>Entregas</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/examenes" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/examenes') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin/examenes"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/examenes') ? 'active' : '' ?>"
+         data-tooltip="Exámenes">
         <i data-lucide="file-check"></i> <span>Exámenes</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/usuarios" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/usuarios') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin/usuarios"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/usuarios') ? 'active' : '' ?>"
+         data-tooltip="Usuarios">
         <i data-lucide="users"></i> <span>Usuarios</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/actividad" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/actividad') ? 'active' : '' ?>">
+      <a href="<?= BASE_URL ?>/admin/actividad"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/actividad') ? 'active' : '' ?>"
+         data-tooltip="Actividad">
         <i data-lucide="activity"></i> <span>Actividad</span>
       </a>
-      <a href="<?= BASE_URL ?>/admin/settings" class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/settings') ? 'active' : '' ?>">
-        <i data-lucide="settings"></i> <span>Settings</span>
+      <a href="<?= BASE_URL ?>/admin/settings"
+         class="sidebar-link <?= str_contains($_SERVER['REQUEST_URI'],'/admin/settings') ? 'active' : '' ?>"
+         data-tooltip="Ajustes">
+        <i data-lucide="settings"></i> <span>Ajustes</span>
       </a>
     </nav>
     <div class="sidebar-footer">
-      <a href="<?= BASE_URL ?>/dashboard" class="sidebar-link"><i data-lucide="arrow-left"></i> <span>Ver sitio</span></a>
-      <a href="<?= BASE_URL ?>/logout" class="sidebar-link"><i data-lucide="log-out"></i> <span>Salir</span></a>
+      <a href="<?= BASE_URL ?>/dashboard" class="sidebar-link" data-tooltip="Ver sitio">
+        <i data-lucide="arrow-left"></i> <span>Ver sitio</span>
+      </a>
+      <a href="<?= BASE_URL ?>/logout" class="sidebar-link" data-tooltip="Salir">
+        <i data-lucide="log-out"></i> <span>Salir</span>
+      </a>
+      <button id="sidebar-collapse-btn" class="sidebar-collapse-btn"
+              aria-label="Colapsar menú" onclick="toggleSidebar()">
+        <i data-lucide="chevrons-left"></i>
+      </button>
     </div>
   </aside>
 
