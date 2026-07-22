@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ──────────────────────────────────────────────────
+    // ── Dashboard ─────────────────────────────────────────��─────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +25,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ───────────────────────────────────────────────────
+    // ── Courses ───────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,7 +53,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ────────────────────────────────────────────────
+    // ── Deliveries ────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -175,7 +175,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ──────────────────────────────────────────────────────
+    // ── Exams ─────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -239,7 +239,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ──────────────────────────────────────────────────────
+    // ── Users ───────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -330,7 +330,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ────────────────────────────────────────────────
+    // ── Activity ──────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -340,7 +340,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ────────────────────────────────────────────────
+    // ── Settings ──────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -378,13 +378,11 @@ class AdminController
             }
         }
 
-        // Normalizar exam_schedule
         $examSchedule = in_array($_POST['exam_schedule'] ?? '', ['last_saturday','always','custom_days'])
             ? $_POST['exam_schedule']
             : 'last_saturday';
         $_POST['exam_schedule'] = $examSchedule;
 
-        // Normalizar exam_custom_days (array de ints 0-6 -> cadena CSV)
         $rawDays = isset($_POST['exam_custom_days']) && is_array($_POST['exam_custom_days'])
             ? $_POST['exam_custom_days']
             : [];
@@ -417,7 +415,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    // ── API Tokens ──────────────────────────────────────────────
+    // ── API Tokens ──────────────────────���───────────────────
     public function createToken(array $params = []): void
     {
         $this->boot();
@@ -442,5 +440,131 @@ class AdminController
         ActivityLogger::log($_SESSION['user_id'], 'token_deleted', "Token ID: {$id}");
         $_SESSION['flash_success'] = 'Token eliminado.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;
+    }
+
+    // ── Títulos: impresión masiva ───────────────────────────────
+
+    /**
+     * GET /admin/titulos-masivos
+     * Lista paginada (20/pág, DESC) de alumnos inscritos con examen realizado.
+     */
+    public function titlesBulk(array $params = []): void
+    {
+        $this->boot();
+
+        $perPage = 20;
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $offset  = ($page - 1) * $perPage;
+
+        // Total para paginación
+        $totalRows = (int) Database::fetchColumn(
+            "SELECT COUNT(*) FROM rsgrup_enrollments en
+             JOIN rsgrup_users u ON u.id = en.user_id
+             JOIN rsgrup_deliveries d ON d.id = en.delivery_id
+             JOIN rsgrup_exam_attempts ea ON ea.enrollment_id = en.id
+             WHERE en.status = 'active'
+             GROUP BY en.id
+             LIMIT 1000000"
+        );
+        // COUNT(*) sobre subquery pa obtener total real
+        $totalRows = (int) Database::fetchColumn(
+            "SELECT COUNT(*) FROM (
+                SELECT en.id
+                FROM rsgrup_enrollments en
+                JOIN rsgrup_users u   ON u.id  = en.user_id
+                JOIN rsgrup_deliveries d ON d.id = en.delivery_id
+                WHERE en.status = 'active'
+                  AND EXISTS (
+                      SELECT 1 FROM rsgrup_exam_attempts ea
+                      WHERE ea.enrollment_id = en.id
+                  )
+             ) sub"
+        );
+
+        $rows = Database::fetchAll(
+            "SELECT
+                en.id          AS enrollment_id,
+                u.name,
+                u.surnames,
+                u.email,
+                d.title        AS delivery_title,
+                DATE_FORMAT(en.created_at,'%d/%m/%Y') AS enrolled_at,
+                (
+                    SELECT ea2.score
+                    FROM rsgrup_exam_attempts ea2
+                    WHERE ea2.enrollment_id = en.id
+                    ORDER BY ea2.created_at DESC
+                    LIMIT 1
+                ) AS score
+             FROM rsgrup_enrollments en
+             JOIN rsgrup_users u      ON u.id  = en.user_id
+             JOIN rsgrup_deliveries d ON d.id  = en.delivery_id
+             WHERE en.status = 'active'
+               AND EXISTS (
+                   SELECT 1 FROM rsgrup_exam_attempts ea
+                   WHERE ea.enrollment_id = en.id
+               )
+             ORDER BY en.created_at DESC
+             LIMIT ? OFFSET ?",
+            [$perPage, $offset]
+        );
+
+        $passingScore = ExamModel::passingScore();
+        $metaTitle    = 'Impresión masiva de títulos';
+        $robots       = 'noindex,nofollow';
+        include BASE_PATH . '/templates/admin/titles_bulk.php';
+    }
+
+    /**
+     * POST /admin/titulos-masivos/generar
+     * Recibe enrollment_ids[], genera un PDF con un título por página
+     * usando CertificateService y lo devuelve al navegador.
+     */
+    public function titlesBulkGenerate(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+
+        $rawIds = isset($_POST['enrollment_ids']) && is_array($_POST['enrollment_ids'])
+            ? $_POST['enrollment_ids']
+            : [];
+        $enrollmentIds = array_values(array_unique(array_map('intval', $rawIds)));
+        $enrollmentIds = array_filter($enrollmentIds, fn($id) => $id > 0);
+
+        if (empty($enrollmentIds)) {
+            $_SESSION['flash_error'] = 'No se seleccionó ningún alumno.';
+            header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
+        }
+
+        // Recuperar datos de cada inscripción
+        $placeholders = implode(',', array_fill(0, count($enrollmentIds), '?'));
+        $rows = Database::fetchAll(
+            "SELECT
+                en.id AS enrollment_id,
+                u.name, u.surnames, u.email,
+                d.title AS delivery_title
+             FROM rsgrup_enrollments en
+             JOIN rsgrup_users u      ON u.id  = en.user_id
+             JOIN rsgrup_deliveries d ON d.id  = en.delivery_id
+             WHERE en.id IN ({$placeholders})
+               AND en.status = 'active'
+             ORDER BY FIELD(en.id, {$placeholders})",
+            array_merge($enrollmentIds, $enrollmentIds)
+        );
+
+        if (empty($rows)) {
+            $_SESSION['flash_error'] = 'No se encontraron inscripciones válidas.';
+            header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
+        }
+
+        // Generar PDF masivo vía CertificateService
+        $pdfContent = CertificateService::generateBulk($rows);
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="titulos-masivos-' . date('Ymd-His') . '.pdf"');
+        header('Content-Length: ' . strlen($pdfContent));
+        header('Cache-Control: no-store');
+        echo $pdfContent;
+        exit;
     }
 }
