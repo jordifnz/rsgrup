@@ -3,6 +3,18 @@ declare(strict_types=1);
 
 class ExamModel
 {
+    /** Nota mínima para aprobar (porcentaje). Configurable desde rsgrup_settings. */
+    public static function passingScore(): float
+    {
+        $val = Database::fetchColumn("SELECT value FROM rsgrup_settings WHERE `key`='exam_passing_score'");
+        return ($val !== null && $val !== false) ? (float)$val : 50.0;
+    }
+
+    public static function isPassing(float $score): bool
+    {
+        return $score >= self::passingScore();
+    }
+
     public static function findById(int $id): ?array
     {
         return Database::fetch('SELECT * FROM rsgrup_exams WHERE id=?', [$id]) ?: null;
@@ -23,12 +35,31 @@ class ExamModel
         return $exam;
     }
 
+    /** Último intento del alumno para este examen. */
     public static function getLastAttempt(int $userId, int $examId): ?array
     {
         return Database::fetch(
             'SELECT * FROM rsgrup_exam_attempts WHERE user_id=? AND exam_id=? ORDER BY created_at DESC LIMIT 1',
             [$userId, $examId]
         ) ?: null;
+    }
+
+    /** Número total de intentos del alumno para este examen. */
+    public static function getAttemptCount(int $userId, int $examId): int
+    {
+        return (int) Database::fetchColumn(
+            'SELECT COUNT(*) FROM rsgrup_exam_attempts WHERE user_id=? AND exam_id=?',
+            [$userId, $examId]
+        );
+    }
+
+    /** Todos los intentos del alumno, del más reciente al más antiguo. */
+    public static function getAllAttempts(int $userId, int $examId): array
+    {
+        return Database::fetchAll(
+            'SELECT * FROM rsgrup_exam_attempts WHERE user_id=? AND exam_id=? ORDER BY created_at DESC',
+            [$userId, $examId]
+        ) ?: [];
     }
 
     // ── Disponibilidad del examen ──────────────────────────────────────────
