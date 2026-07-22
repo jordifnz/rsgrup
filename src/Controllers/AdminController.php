@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ─────────────────────────────────────��───────────────
+    // ── Dashboard ─────────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -64,22 +64,37 @@ class AdminController
         exit;
     }
 
-    // ── Entregas (nivel inscripción alumno) ──────────────────────────
+    // ── Entregas ──────────────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
-        $deliveries = Database::fetchAll(
-            'SELECT d.*,
-                    c.title                    AS course_title,
-                    COUNT(DISTINCT t.id)       AS topic_count,
-                    COUNT(DISTINCT en.id)      AS enrolled_count
-             FROM rsgrup_deliveries d
-             LEFT JOIN rsgrup_courses     c  ON c.id  = d.course_id
-             LEFT JOIN rsgrup_topics      t  ON t.delivery_id = d.id
-             LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.status = "active"
-             GROUP BY d.id
-             ORDER BY d.sort_order ASC'
-        );
+        try {
+            $deliveries = Database::fetchAll(
+                'SELECT d.*,
+                        c.title                    AS course_title,
+                        COUNT(DISTINCT t.id)       AS topic_count,
+                        COUNT(DISTINCT en.id)      AS enrolled_count
+                 FROM rsgrup_deliveries d
+                 LEFT JOIN rsgrup_courses     c  ON c.id  = d.course_id
+                 LEFT JOIN rsgrup_topics      t  ON t.delivery_id = d.id
+                 LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.status = "active"
+                 GROUP BY d.id
+                 ORDER BY d.sort_order ASC'
+            );
+        } catch (\Throwable $e) {
+            error_log('[RSGrup] deliveries query error: ' . $e->getMessage());
+            $deliveries = Database::fetchAll(
+                'SELECT d.*,
+                        c.title                    AS course_title,
+                        0                          AS topic_count,
+                        COUNT(DISTINCT en.id)      AS enrolled_count
+                 FROM rsgrup_deliveries d
+                 LEFT JOIN rsgrup_courses     c  ON c.id  = d.course_id
+                 LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.status = "active"
+                 GROUP BY d.id
+                 ORDER BY d.sort_order ASC'
+            );
+        }
         $courses   = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
         $metaTitle = 'Entregas';
         $robots    = 'noindex,nofollow';
@@ -176,21 +191,30 @@ class AdminController
         exit;
     }
 
-    // ── Temas (ex-Entregas) ─────────────────────────────────────────
+    // ── Temas ─────────────────────────────────────────────────────────
     public function topics(array $params = []): void
     {
         $this->boot();
-        $topics     = Database::fetchAll(
-            'SELECT t.*,
-                    d.title AS delivery_title,
-                    e.title AS exam_title
-             FROM rsgrup_topics t
-             LEFT JOIN rsgrup_deliveries d ON d.id = t.delivery_id
-             LEFT JOIN rsgrup_exams      e ON e.id = t.exam_id
-             ORDER BY t.delivery_id ASC, t.sort_order ASC, t.id ASC'
-        );
+        try {
+            $topics = Database::fetchAll(
+                'SELECT t.*,
+                        d.title AS delivery_title,
+                        e.title AS exam_title
+                 FROM rsgrup_topics t
+                 LEFT JOIN rsgrup_deliveries d ON d.id = t.delivery_id
+                 LEFT JOIN rsgrup_exams      e ON e.id = t.exam_id
+                 ORDER BY t.delivery_id ASC, t.sort_order ASC, t.id ASC'
+            );
+        } catch (\Throwable $e) {
+            error_log('[RSGrup] topics query error: ' . $e->getMessage());
+            $topics = [];
+        }
         $deliveries = Database::fetchAll('SELECT id, title FROM rsgrup_deliveries ORDER BY sort_order');
-        $exams      = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
+        try {
+            $exams = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
+        } catch (\Throwable $e) {
+            $exams = [];
+        }
         $metaTitle  = 'Temas';
         $robots     = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/topics.php';
@@ -222,7 +246,6 @@ class AdminController
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        // PDF upload
         $pdfFile = $id ? (Database::fetchColumn('SELECT pdf_file FROM rsgrup_topics WHERE id=?', [$id]) ?: null) : null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
@@ -272,20 +295,30 @@ class AdminController
         exit;
     }
 
-    // ── Exams ───────────────────────────────────────────────────────
+    // ── Exams ─────────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
-        $exams = Database::fetchAll(
-            'SELECT e.*,
-                    t.title AS topic_title,
-                    COUNT(DISTINCT q.id) AS question_count
-             FROM rsgrup_exams e
-             LEFT JOIN rsgrup_topics          t ON t.exam_id = e.id
-             LEFT JOIN rsgrup_exam_questions  q ON q.exam_id = e.id
-             GROUP BY e.id
-             ORDER BY e.id DESC'
-        );
+        try {
+            $exams = Database::fetchAll(
+                'SELECT e.*,
+                        t.title AS topic_title,
+                        COUNT(DISTINCT q.id) AS question_count
+                 FROM rsgrup_exams e
+                 LEFT JOIN rsgrup_topics          t ON t.exam_id = e.id
+                 LEFT JOIN rsgrup_exam_questions  q ON q.exam_id = e.id
+                 GROUP BY e.id
+                 ORDER BY e.id DESC'
+            );
+        } catch (\Throwable $e) {
+            error_log('[RSGrup] exams query error: ' . $e->getMessage());
+            $exams = Database::fetchAll(
+                'SELECT e.*, NULL AS topic_title, COUNT(DISTINCT q.id) AS question_count
+                 FROM rsgrup_exams e
+                 LEFT JOIN rsgrup_exam_questions q ON q.exam_id = e.id
+                 GROUP BY e.id ORDER BY e.id DESC'
+            );
+        }
         $metaTitle = 'Exámenes';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/exams.php';
@@ -294,15 +327,20 @@ class AdminController
     public function examEditor(array $params = []): void
     {
         $this->boot();
-        $id     = Sanitize::int($params['id'] ?? 0);
-        $exam   = $id ? ExamModel::findWithQuestions($id) : null;
-        $topics = Database::fetchAll(
-            'SELECT t.id, CONCAT(d.title, " — ", t.title) AS title
-             FROM rsgrup_topics t
-             JOIN rsgrup_deliveries d ON d.id = t.delivery_id
-             WHERE t.active = 1
-             ORDER BY d.sort_order, t.sort_order'
-        );
+        $id   = Sanitize::int($params['id'] ?? 0);
+        $exam = $id ? ExamModel::findWithQuestions($id) : null;
+        try {
+            $topics = Database::fetchAll(
+                'SELECT t.id, CONCAT(d.title, " — ", t.title) AS title
+                 FROM rsgrup_topics t
+                 JOIN rsgrup_deliveries d ON d.id = t.delivery_id
+                 WHERE t.active = 1
+                 ORDER BY d.sort_order, t.sort_order'
+            );
+        } catch (\Throwable $e) {
+            error_log('[RSGrup] examEditor topics query error: ' . $e->getMessage());
+            $topics = [];
+        }
         $metaTitle = $id ? 'Editar Exámen' : 'Nuevo Exámen';
         $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/exam_edit.php';
@@ -328,9 +366,12 @@ class AdminController
             );
             $id = (int) Database::lastInsertId();
         }
-        // Vincular examen al tema seleccionado
         if ($topicId) {
-            Database::execute('UPDATE rsgrup_topics SET exam_id=? WHERE id=?', [$id, $topicId]);
+            try {
+                Database::execute('UPDATE rsgrup_topics SET exam_id=? WHERE id=?', [$id, $topicId]);
+            } catch (\Throwable $e) {
+                error_log('[RSGrup] saveExam link topic error: ' . $e->getMessage());
+            }
         }
         if (isset($_POST['questions']) && is_array($_POST['questions'])) {
             ExamModel::saveQuestions($id, $_POST['questions']);
@@ -570,7 +611,7 @@ class AdminController
     public function createToken(array $params = []): void { $this->createApiToken($params); }
     public function deleteToken(array $params = []): void  { $this->deleteApiToken($params); }
 
-    // ── Títulos: impresión masiva ──────────────────────────────────────
+    // ── Títulos: impresión masiva ─────────────────────────────────────
     public function titlesBulk(array $params = []): void
     {
         $this->boot();
