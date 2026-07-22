@@ -341,7 +341,8 @@ class AdminController
                 $filename = $this->attachmentFilename($origName, $attDir);
                 move_uploaded_file($tmpName, $attDir . '/' . $filename);
 
-                $desc = Sanitize::string($descs[$i] ?? '', 500);
+                // Permitir HTML en la descripción del adjunto
+                $desc = Sanitize::html($descs[$i] ?? '');
                 Database::execute(
                     'INSERT INTO rsgrup_topic_attachments (topic_id, filename, original_name, description, sort_order, created_at)
                      VALUES (?,?,?,?,?,NOW())',

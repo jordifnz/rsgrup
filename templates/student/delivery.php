@@ -132,9 +132,9 @@ $attachmentsByTopic = TopicModel::attachmentsForDelivery((int)$delivery['id']);
 
                 <!-- Filas de adjuntos adicionales -->
                 <?php foreach ($topicAttachments as $att):
-                  $attLabel = $att['description'] ?: $att['original_name'];
-                  $ext      = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
-                  $attIcon  = match($ext) {
+                  $hasHtmlDesc = !empty($att['description']);
+                  $ext         = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
+                  $attIcon     = match($ext) {
                     'pdf'                    => 'file-text',
                     'doc','docx'             => 'file-type-2',
                     'xls','xlsx'             => 'table',
@@ -146,12 +146,13 @@ $attachmentsByTopic = TopicModel::attachmentsForDelivery((int)$delivery['id']);
                     default                  => 'paperclip',
                   };
                 ?>
-                <div class="delivery-row enrolled">
-                  <div class="delivery-info">
-                    <i data-lucide="<?= $attIcon ?>" style="width:16px;height:16px"></i>
-                    <span class="delivery-title"><?= htmlspecialchars($attLabel) ?></span>
-                    <?php if ($att['description'] && $att['description'] !== $att['original_name']): ?>
-                      <span style="font-size:var(--text-xs);color:var(--color-text-muted)"><?= htmlspecialchars($att['original_name']) ?></span>
+                <div class="delivery-row enrolled" style="flex-wrap:wrap">
+                  <div class="delivery-info" style="flex:1;min-width:0">
+                    <i data-lucide="<?= $attIcon ?>" style="width:16px;height:16px;flex-shrink:0"></i>
+                    <?php if ($hasHtmlDesc): ?>
+                      <div class="richtext" style="font-size:var(--text-sm);margin:0"><?= $att['description'] ?></div>
+                    <?php else: ?>
+                      <span class="delivery-title"><?= htmlspecialchars($att['original_name']) ?></span>
                     <?php endif; ?>
                   </div>
                   <div class="delivery-actions">

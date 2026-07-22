@@ -39,7 +39,14 @@ $deliveryFilter = (int)($_GET['delivery_id'] ?? 0);
   margin-top: var(--space-2);
 }
 .att-new-row input[type="file"] { flex: 0 0 auto; }
-.att-new-row input[type="text"] { flex: 1; min-width: 0; }
+.att-new-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 60px;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+}
 </style>
 
 <script>
@@ -74,7 +81,7 @@ window.openTopicModal = function(t) {
         '<input type="checkbox" name="delete_attachment[]" value="' + a.id + '" id="del-att-' + a.id + '">'
         + '<label for="del-att-' + a.id + '" style="cursor:pointer;color:var(--color-error);font-size:var(--text-xs)" title="Marcar para eliminar">✕</label>'
         + '<span style="font-size:var(--text-sm);flex:1">' + escHtml(a.original_name) + '</span>'
-        + '<span style="font-size:var(--text-xs);color:var(--color-text-muted);flex:1">' + escHtml(a.description || '') + '</span>';
+        + '<span style="font-size:var(--text-xs);color:var(--color-text-muted);flex:1;font-family:monospace">' + escHtml(a.description || '') + '</span>';
       attContainer.appendChild(row);
     });
     document.getElementById('t-attachments-existing-wrap').style.display = 'block';
@@ -96,13 +103,12 @@ function escHtml(s) {
 
 function addAttachmentRow() {
   var wrap = document.getElementById('t-attachments-new');
-  var idx  = wrap.children.length;
   var row  = document.createElement('div');
   row.className = 'att-new-row';
   row.innerHTML =
     '<input type="file" name="attachments[]" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.mp4,.mp3"'
     + ' onchange="if(this.value) addAttachmentRow()">'
-    + '<input type="text" name="attachment_desc[]" placeholder="Descripción del adjunto (opcional)">';
+    + '<textarea name="attachment_desc[]" placeholder="Descripción del adjunto (admite HTML, opcional)"></textarea>';
   wrap.appendChild(row);
 }
 </script>
@@ -222,7 +228,7 @@ $visibleTopics = $deliveryFilter
         <!-- Nuevos adjuntos -->
         <div class="form-group form-group--full">
           <label style="margin-bottom:var(--space-1);display:block">Añadir adjuntos adicionales
-            <small style="color:var(--color-text-muted);font-weight:400"> — PDF, Word, Excel, imagen, ZIP…</small>
+            <small style="color:var(--color-text-muted);font-weight:400"> — PDF, Word, Excel, imagen, ZIP… La descripción admite HTML.</small>
           </label>
           <div id="t-attachments-new"></div>
           <small style="color:var(--color-text-muted)">Se añade automáticamente una fila nueva al seleccionar un archivo.</small>
