@@ -19,8 +19,8 @@ class CertificateService
     private const FONT_CACHE_DIR = '/tmp/rsgrup_fonts';
 
     private const TTF_MIRRORS = [
-        'https://raw.githubusercontent.com/rsms/inter/v4.0/src/static/Inter-Bold.ttf',
         'https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/src/static/Inter-Bold.ttf',
+        'https://raw.githubusercontent.com/rsms/inter/v4.0/src/static/Inter-Bold.ttf',
         'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZNhiJ-Ek-_EeA.ttf',
     ];
 
@@ -28,7 +28,7 @@ class CertificateService
 
     public function generate(array $user): void
     {
-        $img      = $this->buildImage($user);
+        $img = $this->buildImage($user);
         if ($img === null) return;
         $fullName = trim(($user['name'] ?? '') . ' ' . ($user['surnames'] ?? ''));
         $this->outputPdf($img, $fullName);
@@ -61,7 +61,6 @@ class CertificateService
         foreach ($rows as $row) {
             $fullName = trim(($row['name'] ?? '') . ' ' . ($row['surnames'] ?? ''));
 
-            // Cargamos el fondo
             if (!file_exists($bgPath)) {
                 $img = imagecreatetruecolor(2970, 2100);
                 imagefill($img, 0, 0, imagecolorallocate($img, 255, 255, 255));
@@ -101,7 +100,7 @@ class CertificateService
             @unlink($tmpImg);
         }
 
-        // F = devuelve el PDF como string
+        // S = devuelve el PDF como string
         return $pdf->Output('S');
     }
 
@@ -159,6 +158,7 @@ class CertificateService
 
     private function resolveFont(): ?string
     {
+        // 1º: fuentes del repo (si algún día se sube un TTF real)
         $repoCandidates = [
             BASE_PATH . '/public/assets/fonts/Inter-Bold.ttf',
             BASE_PATH . '/public/assets/fonts/NotoSans-Bold.ttf',
@@ -170,6 +170,8 @@ class CertificateService
                 return $path;
             }
         }
+
+        // 2º: caché en /tmp (se descarga automáticamente)
         return $this->getCachedFont();
     }
 
@@ -178,9 +180,11 @@ class CertificateService
         $cacheDir  = self::FONT_CACHE_DIR;
         $cachePath = $cacheDir . '/' . self::FONT_NAME;
 
+        // Limpiar caché anterior con nombre distinto
         $oldCache = $cacheDir . '/DejaVuSans-Bold.ttf';
         if (file_exists($oldCache)) @unlink($oldCache);
 
+        // Usar caché si ya existe y es válida
         if (file_exists($cachePath) && filesize($cachePath) > 10_000 && $this->isTtfValid($cachePath)) {
             return $cachePath;
         }
@@ -203,6 +207,7 @@ class CertificateService
                 error_log('[RSGrup] Mirror fallido: ' . $url);
                 continue;
             }
+            // Verificar firma TTF/OTF
             $sfVersion = unpack('N', substr($data, 0, 4))[1];
             if (!in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true)) {
                 error_log('[RSGrup] No es TTF válido: ' . $url);
@@ -227,7 +232,7 @@ class CertificateService
         return in_array($sfVersion, [0x00010000, 0x4F54544F, 0x74727565], true);
     }
 
-    // ── Fallback bitmap ─────────────────────────────────────────────
+    // ── Fallback bitmap (si todo falla, texto GD básico) ────────────
 
     private function drawTextFallback(
         \GdImage $img, string $text, int $x, int $y, int $fontSize, int $textColor
@@ -289,7 +294,7 @@ class CertificateService
 
     private function getSetting(string $key, string $default = ''): string
     {
-        $row = Database::fetch('SELECT value FROM rsgrup_settings WHERE `key`=?', [$key]);
+        $row = Database::fetch('SELECT `value` FROM rsgrup_settings WHERE `key`=?', [$key]);
         return $row ? (string)$row['value'] : $default;
     }
 
