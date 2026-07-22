@@ -9,7 +9,15 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ─────────────────────────────────────────────
+    // ── Dashboard ─────────────────────────────────────────────────────
+class AdminController
+{
+    private function boot(): void
+    {
+        requireLogin();
+        requireAdmin();
+    }
+
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -25,7 +33,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ───────────────────────────────────────────────
+    // ── Courses ─────────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -53,19 +61,29 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/cursos'); exit;
     }
 
-    // ── Deliveries ────────────────────────────────────────────
+    // ── Deliveries (nivel inscripción) ─────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
-        $deliveries = Database::fetchAll('SELECT d.*, c.title AS course_title, e.title AS exam_title FROM rsgrup_deliveries d LEFT JOIN rsgrup_courses c ON c.id=d.course_id LEFT JOIN rsgrup_exams e ON e.id=d.exam_id ORDER BY d.sort_order ASC');
-        $exams      = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
-        $courses    = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
-        $metaTitle  = 'Entregas';
-        $robots     = 'noindex,nofollow';
+        $deliveries = Database::fetchAll(
+            'SELECT d.*, c.title AS course_title,
+                    COUNT(DISTINCT dt.topic_id) AS topic_count,
+                    COUNT(DISTINCT en.id) AS enrolled_count
+             FROM rsgrup_deliveries d
+             LEFT JOIN rsgrup_courses c ON c.id = d.course_id
+             LEFT JOIN rsgrup_delivery_topics dt ON dt.delivery_id = d.id
+             LEFT JOIN rsgrup_enrollments en ON en.delivery_id = d.id AND en.status = "active"
+             GROUP BY d.id
+             ORDER BY d.sort_order ASC'
+        );
+        $courses = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
+        $topics  = TopicModel::getAll();
+        $metaTitle = 'Entregas';
+        $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/deliveries.php';
     }
 
-    /** AJAX: devuelve JSON con los inscritos de una entrega */
+    /** AJAX: inscritos de una entrega */
     public function deliveryEnrolled(array $params = []): void
     {
         $this->boot();
@@ -84,39 +102,19 @@ class AdminController
         exit;
     }
 
-    /** Dar de baja a un inscrito desde la vista de entregas */
     public function deliveryUnenroll(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
-        $deliveryId    = Sanitize::int($params['id']             ?? 0);
-        $enrollmentId  = Sanitize::int($params['enrollment_id']  ?? 0);
+        $deliveryId   = Sanitize::int($params['id']            ?? 0);
+        $enrollmentId = Sanitize::int($params['enrollment_id'] ?? 0);
         Database::execute(
             'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND delivery_id=?',
             [$enrollmentId, $deliveryId]
         );
-        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} de entrega ID:{$deliveryId}");
+        ActivityLogger::log($_SESSION['user_id'], 'unenroll', "Baja inscripción ID:{$enrollmentId} entrega ID:{$deliveryId}");
         $_SESSION['flash_success'] = 'Alumno dado de baja correctamente.';
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
-    }
-
-    private function pdfFilename(string $title, string $dir): string
-    {
-        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
-        $base = preg_replace('/\s+/', '_', trim($base));
-        $base = preg_replace('/[^A-Za-z0-9_\-]/', '', $base);
-        $base = trim($base, '_-') ?: 'entrega';
-
-        $filename = $base . '.pdf';
-        if (!file_exists($dir . '/' . $filename)) {
-            return $filename;
-        }
-        $i = 2;
-        do {
-            $filename = $base . '_' . $i . '.pdf';
-            $i++;
-        } while (file_exists($dir . '/' . $filename));
-        return $filename;
     }
 
     public function saveDelivery(array $params = []): void
@@ -130,36 +128,38 @@ class AdminController
         $type        = in_array($_POST['type']??'', ['matricula','entrega','practica']) ? $_POST['type'] : 'entrega';
         $price       = Sanitize::float($_POST['price'] ?? 0);
         $paymentType = ($_POST['payment_type']??'online') === 'presencial' ? 'presencial' : 'online';
-        $examId      = Sanitize::int($_POST['exam_id'] ?? 0) ?: null;
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
         $notifyEmail = isset($_POST['notify_email']) ? 1 : 0;
         $notifyWa    = isset($_POST['notify_whatsapp']) ? 1 : 0;
         $slug        = Sanitize::slug($title);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        $pdfFile = $_POST['existing_pdf'] ?? null;
-        if (!empty($_FILES['pdf_file']['tmp_name'])) {
-            $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
-            if ($ext === 'pdf') {
-                $dir = BASE_PATH . '/private_files';
-                if (!is_dir($dir)) mkdir($dir, 0755, true);
-                $filename = $this->pdfFilename($title, $dir);
-                move_uploaded_file($_FILES['pdf_file']['tmp_name'], $dir . '/' . $filename);
-                $pdfFile = $filename;
-            }
-        }
-
-        $fields = [$courseId,$title,$description,$slug,$type,$price,$paymentType,$examId,$sortOrder,$notifyEmail,$notifyWa,$pdfFile,$active];
+        $fields = [$courseId,$title,$description,$slug,$type,$price,$paymentType,$sortOrder,$notifyEmail,$notifyWa,$active];
         if ($id) {
             Database::execute(
-                'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,exam_id=?,sort_order=?,notify_email=?,notify_whatsapp=?,pdf_file=?,active=?,updated_at=NOW() WHERE id=?',
+                'UPDATE rsgrup_deliveries SET course_id=?,title=?,description=?,slug=?,type=?,price=?,payment_type=?,sort_order=?,notify_email=?,notify_whatsapp=?,active=?,updated_at=NOW() WHERE id=?',
                 array_merge($fields, [$id])
             );
+            // Actualizar temas vinculados
+            Database::execute('DELETE FROM rsgrup_delivery_topics WHERE delivery_id=?', [$id]);
         } else {
             Database::execute(
-                'INSERT INTO rsgrup_deliveries (course_id,title,description,slug,type,price,payment_type,exam_id,sort_order,notify_email,notify_whatsapp,pdf_file,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
+                'INSERT INTO rsgrup_deliveries (course_id,title,description,slug,type,price,payment_type,sort_order,notify_email,notify_whatsapp,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
                 $fields
             );
+            $id = (int)Database::lastInsertId();
+        }
+        // Vincular temas seleccionados
+        $topicIds = isset($_POST['topic_ids']) && is_array($_POST['topic_ids'])
+            ? array_map('intval', $_POST['topic_ids'])
+            : [];
+        foreach ($topicIds as $order => $topicId) {
+            if ($topicId > 0) {
+                Database::execute(
+                    'INSERT IGNORE INTO rsgrup_delivery_topics (delivery_id, topic_id, sort_order) VALUES (?,?,?)',
+                    [$id, $topicId, $order]
+                );
+            }
         }
         ActivityLogger::log($_SESSION['user_id'], 'delivery_saved', "Entrega: {$title}");
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
@@ -175,18 +175,95 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/entregas'); exit;
     }
 
-    // ── Exams ─────────────────────────────────────────────────
+    // ── Topics (ex-Entregas) ───────────────────────────────────────
+    public function topics(array $params = []): void
+    {
+        $this->boot();
+        $topics    = TopicModel::getAllAdmin();
+        $courses   = Database::fetchAll('SELECT id, title FROM rsgrup_courses ORDER BY title');
+        $exams     = Database::fetchAll('SELECT id, title FROM rsgrup_exams ORDER BY title');
+        $metaTitle = 'Temas';
+        $robots    = 'noindex,nofollow';
+        include BASE_PATH . '/templates/admin/topics.php';
+    }
+
+    private function pdfFilename(string $title, string $dir): string
+    {
+        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
+        $base = preg_replace('/\s+/', '_', trim($base));
+        $base = preg_replace('/[^A-Za-z0-9_\-]/', '', $base);
+        $base = trim($base, '_-') ?: 'tema';
+        $filename = $base . '.pdf';
+        if (!file_exists($dir . '/' . $filename)) return $filename;
+        $i = 2;
+        do { $filename = $base . '_' . $i . '.pdf'; $i++; }
+        while (file_exists($dir . '/' . $filename));
+        return $filename;
+    }
+
+    public function saveTopic(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+        $id          = Sanitize::int($_POST['id'] ?? 0);
+        $courseId    = Sanitize::int($_POST['course_id'] ?? 0);
+        $title       = Sanitize::string($_POST['title'] ?? '');
+        $description = Sanitize::html($_POST['description'] ?? '');
+        $examId      = Sanitize::int($_POST['exam_id'] ?? 0) ?: null;
+        $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
+        $slug        = Sanitize::slug($title);
+        $active      = isset($_POST['active']) ? 1 : 0;
+
+        $pdfFile = $_POST['existing_pdf'] ?? null;
+        if (!empty($_FILES['pdf_file']['tmp_name'])) {
+            $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
+            if ($ext === 'pdf') {
+                $dir = BASE_PATH . '/private_files';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $filename = $this->pdfFilename($title, $dir);
+                move_uploaded_file($_FILES['pdf_file']['tmp_name'], $dir . '/' . $filename);
+                $pdfFile = $filename;
+            }
+        }
+
+        $fields = [$courseId,$title,$description,$slug,$examId,$sortOrder,$pdfFile,$active];
+        if ($id) {
+            Database::execute(
+                'UPDATE rsgrup_topics SET course_id=?,title=?,description=?,slug=?,exam_id=?,sort_order=?,pdf_file=?,active=?,updated_at=NOW() WHERE id=?',
+                array_merge($fields, [$id])
+            );
+        } else {
+            Database::execute(
+                'INSERT INTO rsgrup_topics (course_id,title,description,slug,exam_id,sort_order,pdf_file,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())',
+                $fields
+            );
+        }
+        ActivityLogger::log($_SESSION['user_id'], 'topic_saved', "Tema: {$title}");
+        header('Location: '.BASE_URL.'/admin/temas'); exit;
+    }
+
+    public function deleteTopic(array $params = []): void
+    {
+        $this->boot();
+        Csrf::verify();
+        $id = Sanitize::int($params['id'] ?? 0);
+        Database::execute('DELETE FROM rsgrup_topics WHERE id=?', [$id]);
+        ActivityLogger::log($_SESSION['user_id'], 'topic_deleted', "Tema ID: {$id}");
+        header('Location: '.BASE_URL.'/admin/temas'); exit;
+    }
+
+    // ── Exams ──────────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
         $exams = Database::fetchAll(
             'SELECT e.*,
-                    d.title AS delivery_title,
+                    t.title AS topic_title,
                     COUNT(q.id) AS question_count
              FROM rsgrup_exams e
-             LEFT JOIN rsgrup_deliveries d      ON d.exam_id  = e.id
-             LEFT JOIN rsgrup_exam_questions q  ON q.exam_id  = e.id
-             GROUP BY e.id, d.title
+             LEFT JOIN rsgrup_topics t         ON t.exam_id = e.id
+             LEFT JOIN rsgrup_exam_questions q ON q.exam_id = e.id
+             GROUP BY e.id, t.title
              ORDER BY e.id DESC'
         );
         $metaTitle = 'Exámenes';
@@ -197,11 +274,11 @@ class AdminController
     public function examEditor(array $params = []): void
     {
         $this->boot();
-        $id         = Sanitize::int($params['id'] ?? 0);
-        $exam       = $id ? ExamModel::findWithQuestions($id) : null;
-        $deliveries = Database::fetchAll('SELECT id,title FROM rsgrup_deliveries ORDER BY sort_order');
-        $metaTitle  = $id ? 'Editar Exámen' : 'Nuevo Exámen';
-        $robots     = 'noindex,nofollow';
+        $id     = Sanitize::int($params['id'] ?? 0);
+        $exam   = $id ? ExamModel::findWithQuestions($id) : null;
+        $topics = Database::fetchAll('SELECT id, title FROM rsgrup_topics WHERE active=1 ORDER BY sort_order');
+        $metaTitle = $id ? 'Editar Exámen' : 'Nuevo Exámen';
+        $robots    = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/exam_edit.php';
     }
 
@@ -212,15 +289,15 @@ class AdminController
         $id          = Sanitize::int($_POST['id'] ?? 0);
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
-        $deliveryId  = Sanitize::int($_POST['delivery_id'] ?? 0) ?: null;
+        $topicId     = Sanitize::int($_POST['topic_id'] ?? 0) ?: null;
         if ($id) {
             Database::execute('UPDATE rsgrup_exams SET title=?,description=?,updated_at=NOW() WHERE id=?', [$title,$description,$id]);
         } else {
             Database::execute('INSERT INTO rsgrup_exams (title,description,created_at,updated_at) VALUES (?,?,NOW(),NOW())', [$title,$description]);
             $id = (int) Database::lastInsertId();
         }
-        if ($deliveryId) {
-            Database::execute('UPDATE rsgrup_deliveries SET exam_id=? WHERE id=?', [$id, $deliveryId]);
+        if ($topicId) {
+            Database::execute('UPDATE rsgrup_topics SET exam_id=? WHERE id=?', [$id, $topicId]);
         }
         if (isset($_POST['questions']) && is_array($_POST['questions'])) {
             ExamModel::saveQuestions($id, $_POST['questions']);
@@ -239,7 +316,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/examenes'); exit;
     }
 
-    // ── Users ───────────────────────────────────────────────
+    // ── Users ─────────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -276,7 +353,7 @@ class AdminController
         if (!$user) { http_response_code(404); include BASE_PATH.'/public/404.php'; return; }
         $enrollments = Database::fetchAll(
             'SELECT en.*, d.title, d.type FROM rsgrup_enrollments en
-             JOIN rsgrup_deliveries d ON d.id=en.delivery_id
+             JOIN rsgrup_deliveries d ON d.id = en.delivery_id
              WHERE en.user_id=? ORDER BY en.created_at DESC',
             [$id]
         );
@@ -290,8 +367,8 @@ class AdminController
     {
         $this->boot();
         Csrf::verify();
-        $userId       = Sanitize::int($params['id']             ?? 0);
-        $enrollmentId = Sanitize::int($params['enrollment_id']  ?? 0);
+        $userId       = Sanitize::int($params['id']            ?? 0);
+        $enrollmentId = Sanitize::int($params['enrollment_id'] ?? 0);
         Database::execute(
             'UPDATE rsgrup_enrollments SET status=\'cancelled\' WHERE id=? AND user_id=?',
             [$enrollmentId, $userId]
@@ -330,7 +407,7 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/usuarios/'.$id); exit;
     }
 
-    // ── Activity ──────────────────────────────────────────
+    // ── Activity ───────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -340,7 +417,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ──────────────────────────────────────────
+    // ── Settings ───────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -377,21 +454,16 @@ class AdminController
                 }
             }
         }
-
         $examSchedule = in_array($_POST['exam_schedule'] ?? '', ['last_saturday','always','custom_days'])
-            ? $_POST['exam_schedule']
-            : 'last_saturday';
+            ? $_POST['exam_schedule'] : 'last_saturday';
         $_POST['exam_schedule'] = $examSchedule;
-
         $rawDays = isset($_POST['exam_custom_days']) && is_array($_POST['exam_custom_days'])
-            ? $_POST['exam_custom_days']
-            : [];
+            ? $_POST['exam_custom_days'] : [];
         $validDays = array_values(array_unique(
             array_filter(array_map('intval', $rawDays), fn($d) => $d >= 0 && $d <= 6)
         ));
         sort($validDays);
         $_POST['exam_custom_days'] = implode(',', $validDays);
-
         $allowed = [
             'brand_accent_color',
             'paypal_client_id', 'paypal_client_secret', 'paypal_mode',
@@ -404,10 +476,9 @@ class AdminController
         ];
         foreach ($allowed as $key) {
             if (!isset($_POST[$key])) continue;
-            $value = $_POST[$key];
             Database::execute(
                 'INSERT INTO rsgrup_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
-                [$key, $value]
+                [$key, $_POST[$key]]
             );
         }
         ActivityLogger::log($_SESSION['user_id'], 'settings_saved', 'Ajustes guardados');
@@ -415,23 +486,20 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    // ── API Tokens ────────────────────────────────────────────
-    public function createToken(array $params = []): void
+    // ── API Tokens ───────────────────────────────────────────────
+    public function createApiToken(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
         $label = Sanitize::string($_POST['label'] ?? 'Token');
         $token = bin2hex(random_bytes(32));
-        Database::execute(
-            'INSERT INTO rsgrup_api_tokens (label, token, created_at) VALUES (?, ?, NOW())',
-            [$label, $token]
-        );
+        Database::execute('INSERT INTO rsgrup_api_tokens (label, token, created_at) VALUES (?, ?, NOW())', [$label, $token]);
         ActivityLogger::log($_SESSION['user_id'], 'token_created', "Token: {$label}");
         $_SESSION['flash_success'] = 'Token generado: ' . $token . ' — Cópialo ahora, no se mostrará de nuevo.';
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    public function deleteToken(array $params = []): void
+    public function deleteApiToken(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
@@ -442,35 +510,17 @@ class AdminController
         header('Location: '.BASE_URL.'/admin/settings'); exit;
     }
 
-    // ── Títulos: impresión masiva ─────────────────────────────
+    // Alias para compatibilidad con rutas antiguas
+    public function createToken(array $params = []): void { $this->createApiToken($params); }
+    public function deleteToken(array $params = []): void  { $this->deleteApiToken($params); }
 
-    /**
-     * GET /admin/titulos-masivos
-     *
-     * Muestra UN registro por alumno. Condición de aparición:
-     *   1. Inscrito (status=active) en TODAS las entregas activas de su curso.
-     *   2. Ha realizado al menos un examen en cualquiera de esas inscripciones.
-     *
-     * Se muestra la fecha de la inscripción de matrícula (type='matricula').
-     * Si el curso no tiene entrega de tipo matrícula se usa la fecha más antigua.
-     */
+    // ── Títulos: impresión masiva ───────────────────────────��──────
     public function titlesBulk(array $params = []): void
     {
         $this->boot();
-
         $perPage = 20;
         $page    = max(1, (int)($_GET['page'] ?? 1));
         $offset  = ($page - 1) * $perPage;
-
-        /*
-         * Lógica:
-         *   - Por cada curso, contamos cuántas entregas activas tiene.
-         *   - Para cada alumno, contamos cuántas de esas entregas tiene cubiertas
-         *     con una inscripción activa.
-         *   - Solo aparecen cuando ambos conteos coinciden (= inscrito en TODAS).
-         *   - Además debe existir al menos un exam_attempt ligado a alguna de
-         *     sus inscripciones en ese curso.
-         */
         $baseSql = "
             SELECT
                 u.id           AS user_id,
@@ -485,12 +535,12 @@ class AdminController
                         MIN(en.created_at)
                     ),
                     '%d/%m/%Y'
-                )              AS enrolled_at,
+                ) AS enrolled_at,
                 (
                     SELECT ea2.score
                     FROM   rsgrup_exam_attempts ea2
                     JOIN   rsgrup_enrollments   en2 ON en2.id = ea2.enrollment_id
-                    WHERE  en2.user_id   = u.id
+                    WHERE  en2.user_id = u.id
                       AND  en2.delivery_id IN (
                                SELECT id FROM rsgrup_deliveries
                                WHERE course_id = c.id AND active = 1
@@ -499,86 +549,55 @@ class AdminController
                     LIMIT 1
                 ) AS score
             FROM rsgrup_users u
-            JOIN rsgrup_enrollments  en ON en.user_id    = u.id
-                                       AND en.status     = 'active'
-            JOIN rsgrup_deliveries   d  ON d.id          = en.delivery_id
-                                       AND d.active       = 1
-            JOIN rsgrup_courses      c  ON c.id          = d.course_id
-                                       AND c.active       = 1
+            JOIN rsgrup_enrollments en ON en.user_id = u.id AND en.status = 'active'
+            JOIN rsgrup_deliveries  d  ON d.id = en.delivery_id AND d.active = 1
+            JOIN rsgrup_courses     c  ON c.id = d.course_id AND c.active = 1
             GROUP BY u.id, c.id
             HAVING
-                -- inscrito en TODAS las entregas activas del curso
                 COUNT(DISTINCT en.delivery_id) = (
-                    SELECT COUNT(*)
-                    FROM   rsgrup_deliveries d2
-                    WHERE  d2.course_id = c.id
-                      AND  d2.active    = 1
+                    SELECT COUNT(*) FROM rsgrup_deliveries d2
+                    WHERE d2.course_id = c.id AND d2.active = 1
                 )
-                -- y ha realizado al menos un examen
                 AND EXISTS (
-                    SELECT 1
-                    FROM   rsgrup_exam_attempts ea
-                    JOIN   rsgrup_enrollments   en3 ON en3.id = ea.enrollment_id
-                    WHERE  en3.user_id     = u.id
-                      AND  en3.delivery_id IN (
-                               SELECT id FROM rsgrup_deliveries
-                               WHERE course_id = c.id AND active = 1
-                           )
+                    SELECT 1 FROM rsgrup_exam_attempts ea
+                    JOIN rsgrup_enrollments en3 ON en3.id = ea.enrollment_id
+                    WHERE en3.user_id = u.id
+                      AND en3.delivery_id IN (
+                              SELECT id FROM rsgrup_deliveries
+                              WHERE course_id = c.id AND active = 1
+                          )
                 )
         ";
-
-        $totalRows = (int) Database::fetchColumn(
-            "SELECT COUNT(*) FROM ({$baseSql}) sub"
-        );
-
-        $rows = Database::fetchAll(
-            "{$baseSql} ORDER BY enrolled_at DESC LIMIT ? OFFSET ?",
-            [$perPage, $offset]
-        );
-
+        $totalRows = (int)Database::fetchColumn("SELECT COUNT(*) FROM ({$baseSql}) sub");
+        $rows      = Database::fetchAll("{$baseSql} ORDER BY enrolled_at DESC LIMIT ? OFFSET ?", [$perPage, $offset]);
         $passingScore = ExamModel::passingScore();
         $metaTitle    = 'Impresión masiva de títulos';
         $robots       = 'noindex,nofollow';
         include BASE_PATH . '/templates/admin/titles_bulk.php';
     }
 
-    /**
-     * POST /admin/titulos-masivos/generar
-     * Recibe user_ids[] + course_id[] (pares), genera un PDF con un título
-     * por alumno y lo devuelve al navegador.
-     */
     public function titlesBulkGenerate(array $params = []): void
     {
         $this->boot();
         Csrf::verify();
-
-        // Recibimos pares user_id|course_id codificados como "userId_courseId"
-        $rawIds = isset($_POST['bulk_keys']) && is_array($_POST['bulk_keys'])
-            ? $_POST['bulk_keys']
-            : [];
-
+        $rawIds = isset($_POST['bulk_keys']) && is_array($_POST['bulk_keys']) ? $_POST['bulk_keys'] : [];
         if (empty($rawIds)) {
             $_SESSION['flash_error'] = 'No se seleccionó ningún alumno.';
             header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
         }
-
-        // Reconstruir los datos necesarios para generar cada título
         $rows = [];
         foreach ($rawIds as $key) {
             [$userId, $courseId] = array_map('intval', explode('_', $key));
             if (!$userId || !$courseId) continue;
-
             $row = Database::fetchOne(
-                "SELECT
-                    u.name, u.surnames, u.email,
-                    c.title AS delivery_title,
-                    DATE_FORMAT(
-                        COALESCE(
-                            MIN(CASE WHEN d.type = 'matricula' THEN en.created_at END),
-                            MIN(en.created_at)
-                        ),
-                        '%d/%m/%Y'
-                    ) AS enrolled_at
+                "SELECT u.name, u.surnames, u.email,
+                        c.title AS delivery_title,
+                        DATE_FORMAT(
+                            COALESCE(
+                                MIN(CASE WHEN d.type = 'matricula' THEN en.created_at END),
+                                MIN(en.created_at)
+                            ), '%d/%m/%Y'
+                        ) AS enrolled_at
                  FROM rsgrup_users u
                  JOIN rsgrup_enrollments en ON en.user_id = u.id AND en.status = 'active'
                  JOIN rsgrup_deliveries  d  ON d.id = en.delivery_id AND d.course_id = ?
@@ -589,14 +608,11 @@ class AdminController
             );
             if ($row) $rows[] = $row;
         }
-
         if (empty($rows)) {
             $_SESSION['flash_error'] = 'No se encontraron datos válidos.';
             header('Location: '.BASE_URL.'/admin/titulos-masivos'); exit;
         }
-
         $pdfContent = CertificateService::generateBulk($rows);
-
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="titulos-masivos-' . date('Ymd-His') . '.pdf"');
         header('Content-Length: ' . strlen($pdfContent));
