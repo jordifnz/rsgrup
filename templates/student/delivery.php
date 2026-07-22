@@ -8,21 +8,6 @@ $passingScore = ExamModel::passingScore();
 
 // Cargar adjuntos adicionales de todos los temas de esta entrega
 $attachmentsByTopic = TopicModel::attachmentsForDelivery((int)$delivery['id']);
-
-// Mapa de iconos por extensión
-function attachmentIcon(string $ext): string {
-    return match($ext) {
-        'pdf'                      => 'file-text',
-        'doc','docx'               => 'file-type-2',
-        'xls','xlsx'               => 'table',
-        'ppt','pptx'               => 'presentation',
-        'zip','rar'                => 'file-archive',
-        'jpg','jpeg','png','gif'   => 'image',
-        'mp4'                      => 'video',
-        'mp3'                      => 'music',
-        default                    => 'paperclip',
-    };
-}
 ?>
 <section class="delivery-page">
   <div class="container">
@@ -59,7 +44,7 @@ function attachmentIcon(string $ext): string {
 
       <?php if ($isEnrolled): ?>
 
-        <!-- Descripción de la entrega -->
+        <!-- Descripción -->
         <?php if (!empty($delivery['description'])): ?>
         <div class="delivery-list" style="margin-bottom:var(--space-2)">
           <div class="delivery-row enrolled" style="align-items:flex-start">
@@ -93,15 +78,15 @@ function attachmentIcon(string $ext): string {
           <!-- Lista de temas -->
           <div class="delivery-list">
           <?php foreach ($topics as $topic):
-            $topicId      = (int)$topic['id'];
-            $attempt      = $topic['_attempt'];
-            $attemptsAll  = $topic['_attempts_all'];
-            $aCnt         = $topic['_attempt_count'];
-            $canRetry     = $topic['_can_retry'];
-            $examObj      = $topic['_exam_obj'];
-            $lastPassed   = $attempt && ExamModel::isPassing((float)$attempt['score']);
-            $lastFailed   = $attempt && !ExamModel::isPassing((float)$attempt['score']);
-            $exhausted    = $aCnt >= 2;
+            $topicId     = (int)$topic['id'];
+            $attempt     = $topic['_attempt'];
+            $attemptsAll = $topic['_attempts_all'];
+            $aCnt        = $topic['_attempt_count'];
+            $canRetry    = $topic['_can_retry'];
+            $examObj     = $topic['_exam_obj'];
+            $lastPassed  = $attempt && ExamModel::isPassing((float)$attempt['score']);
+            $lastFailed  = $attempt && !ExamModel::isPassing((float)$attempt['score']);
+            $exhausted   = $aCnt >= 2;
             $topicAttachments = $attachmentsByTopic[$topicId] ?? [];
           ?>
           <div class="delivery-row enrolled" style="flex-wrap:wrap;border-bottom:1px solid var(--color-divider);padding-bottom:var(--space-3);margin-bottom:var(--space-1)">
@@ -123,33 +108,24 @@ function attachmentIcon(string $ext): string {
 
               <!-- PDF principal del tema -->
               <?php if (!empty($topic['pdf_file'])): ?>
-              <a href="<?= BASE_URL ?>/descargar-pdf/topic/<?= $topicId ?>" class="btn btn-sm btn-secondary"
-                 style="display:inline-flex;align-items:center;gap:var(--space-1)">
-                <i data-lucide="file-text" style="width:13px;height:13px"></i> Descargar PDF
+              <a href="<?= BASE_URL ?>/descargar-pdf/topic/<?= $topicId ?>" class="btn btn-sm btn-secondary">
+                <i data-lucide="file-text"></i> Descargar PDF
               </a>
               <?php endif; ?>
 
               <!-- Adjuntos adicionales -->
               <?php if (!empty($topicAttachments)): ?>
-              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
-                <?php foreach ($topicAttachments as $att):
-                  $ext   = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
-                  $icon  = attachmentIcon($ext);
-                  $label = $att['description'] ?: $att['original_name'];
-                ?>
-                <div style="display:flex;align-items:flex-start;gap:var(--space-2)">
-                  <a href="<?= BASE_URL ?>/descargar-adjunto/<?= (int)$att['id'] ?>"
-                     class="btn btn-sm btn-secondary"
-                     style="display:inline-flex;align-items:center;gap:var(--space-1);flex-shrink:0">
-                    <i data-lucide="<?= $icon ?>" style="width:13px;height:13px"></i>
-                    <?= htmlspecialchars($label) ?>
-                  </a>
-                  <?php if (!empty($att['description']) && $att['description'] !== $att['original_name']): ?>
-                  <span style="font-size:var(--text-xs);color:var(--color-text-muted);padding-top:4px;line-height:1.4">
-                    <?= htmlspecialchars($att['original_name']) ?>
-                  </span>
-                  <?php endif; ?>
-                </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+                <?php foreach ($topicAttachments as $att): ?>
+                <a href="<?= BASE_URL ?>/descargar-adjunto/<?= (int)$att['id'] ?>" class="btn btn-sm btn-secondary"
+                   style="display:inline-flex;align-items:center;gap:var(--space-1)">
+                  <i data-lucide="paperclip" style="width:13px;height:13px"></i>
+                  <?php
+                    $ext = strtolower(pathinfo($att['original_name'], PATHINFO_EXTENSION));
+                    $label = $att['description'] ?: $att['original_name'];
+                  ?>
+                  <?= htmlspecialchars($label) ?>
+                </a>
                 <?php endforeach; ?>
               </div>
               <?php endif; ?>
@@ -247,7 +223,7 @@ function attachmentIcon(string $ext): string {
             </div>
             <?php endif; ?>
 
-            <!-- Historial de intentos -->
+            <!-- Historial de intentos (si suspendido y agotado y hay más de uno) -->
             <?php if ($lastFailed && $exhausted && count($attemptsAll) > 1): ?>
             <div style="width:100%;margin-top:var(--space-3);border-top:1px solid var(--color-divider);padding-top:var(--space-3)">
               <details style="font-size:var(--text-xs);color:var(--color-text-muted)">
