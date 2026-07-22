@@ -18,31 +18,6 @@ $baseUrl   = BASE_URL;
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-  <style>
-  /*
-   * CRITICAL: El body.admin-layout usa display:flex.
-   * En Safari iOS, un ancestro con display:flex/grid puede actuar como
-   * containing block para position:fixed, rompiendo el boton flotante.
-   * Solucion: .wa-fab usa transform:translateZ(0) para crear su propio
-   * stacking/compositing context y escapar del containing block del flex.
-   */
-  .wa-fab {
-    position: fixed !important;
-    bottom: 1.5rem !important;
-    right: 1.5rem !important;
-    z-index: 9999 !important;
-    /* transform fuerza compositing layer propio — escapa del flex body en iOS Safari */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    will-change: transform;
-  }
-  @media (max-width: 640px) {
-    .wa-fab {
-      bottom: 1.25rem !important;
-      right: 1rem !important;
-    }
-  }
-  </style>
 </head>
 <body class="admin-layout">
   <a class="sr-only" href="#admin-main">Saltar al contenido</a>
@@ -77,7 +52,7 @@ $baseUrl   = BASE_URL;
     </nav>
     <div class="sidebar-footer">
       <a href="<?= BASE_URL ?>/dashboard" class="sidebar-link"><i data-lucide="arrow-left"></i> <span>Ver sitio</span></a>
-      <a href="<?= BASE_URL ?>/logout" class="sidebar-link text-error"><i data-lucide="log-out"></i> <span>Salir</span></a>
+      <a href="<?= BASE_URL ?>/logout" class="sidebar-link"><i data-lucide="log-out"></i> <span>Salir</span></a>
     </div>
   </aside>
 
