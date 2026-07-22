@@ -25,10 +25,12 @@ try {
   var t = '';
   try { t = localStorage.getItem('rsgrup-theme') || ''; } catch(e) {}
   document.documentElement.setAttribute('data-theme', t || 'dark');
-  // Aplicar estado de sidebar colapsado en desktop (evita parpadeo)
-  var collapsed = false;
-  try { collapsed = localStorage.getItem('rsgrup-sidebar-collapsed') === '1'; } catch(e) {}
-  if (collapsed) document.documentElement.classList.add('sidebar-collapsed');
+  // Colapso sidebar solo en desktop (>= 768px)
+  if (window.innerWidth >= 768) {
+    var collapsed = false;
+    try { collapsed = localStorage.getItem('rsgrup-sidebar-collapsed') === '1'; } catch(e) {}
+    if (collapsed) document.documentElement.classList.add('sidebar-collapsed');
+  }
 })();
 </script>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
@@ -36,19 +38,18 @@ try {
   :root {
     --color-brand: <?= htmlspecialchars($accentColor) ?>;
     --color-brand-hover: color-mix(in srgb, <?= htmlspecialchars($accentColor) ?> 80%, #000);
-
     --sidebar-w:           220px;
     --sidebar-w-collapsed: 56px;
   }
 
-  /* ── Layout base ──────────────────────────────────────── */
+  /* ── Layout raíz ────────────────────────────── */
   .admin-layout {
     display: flex;
     min-height: 100dvh;
-    overflow: hidden;   /* evitar scroll horizontal a nivel raíz */
+    /* SIN overflow:hidden — lo gestiona cada hijo */
   }
 
-  /* ── Sidebar ───────────────────────────────────────────── */
+  /* ── Sidebar (desktop) ──────────────────────── */
   .admin-sidebar {
     width: var(--sidebar-w);
     flex-shrink: 0;
@@ -57,39 +58,39 @@ try {
     position: relative;
     z-index: 200;
   }
-
-  /* Colapso en desktop */
   .sidebar-collapsed .admin-sidebar {
     width: var(--sidebar-w-collapsed);
   }
-  .sidebar-collapsed .sidebar-link span,
-  .sidebar-collapsed .sidebar-logo img,
-  .sidebar-collapsed .sidebar-logo-text {
-    opacity: 0;
-    pointer-events: none;
-    width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  .sidebar-collapsed .sidebar-link {
-    justify-content: center;
-    padding-inline: 0;
-  }
-  .sidebar-collapsed .sidebar-icon {
-    margin: 0 auto;
-  }
-  .sidebar-collapsed .sidebar-logo {
-    justify-content: center;
-    padding-inline: 0;
+
+  /* Ocultar texto de links cuando está colapsado (SOLO desktop) */
+  @media (min-width: 768px) {
+    .sidebar-collapsed .sidebar-link > span,
+    .sidebar-collapsed .sidebar-footer .sidebar-link > span {
+      display: none;
+    }
+    .sidebar-collapsed .sidebar-link {
+      justify-content: center;
+      padding-inline: 0;
+    }
+    .sidebar-collapsed .sidebar-icon {
+      margin-inline: auto;
+    }
+    .sidebar-collapsed .sidebar-logo {
+      justify-content: center;
+      padding-inline: 0;
+    }
+    .sidebar-collapsed .sidebar-logo img {
+      max-width: 36px;
+    }
   }
 
-  /* Botón toggle sidebar (desktop) */
+  /* Botón toggle «colapsar» (solo desktop) */
   .sidebar-toggle {
-    display: flex;
+    display: none; /* oculto en móvil */
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     border: 1px solid var(--color-border, #333);
     background: var(--color-surface, #1c1b19);
@@ -97,7 +98,7 @@ try {
     cursor: pointer;
     position: absolute;
     top: 14px;
-    right: -14px;
+    right: -13px;
     z-index: 210;
     transition: background 0.18s, color 0.18s;
     flex-shrink: 0;
@@ -107,70 +108,63 @@ try {
     color: #fff;
     border-color: var(--color-brand);
   }
-  .sidebar-toggle svg {
-    transition: transform 0.22s ease;
-  }
-  .sidebar-collapsed .sidebar-toggle svg {
-    transform: rotate(180deg);
+  .sidebar-toggle svg { transition: transform 0.22s ease; }
+  .sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+  @media (min-width: 768px) {
+    .sidebar-toggle { display: flex; }
   }
 
-  /* ── Mobile: sidebar como drawer ──────────────────────── */
+  /* ── Móvil: sidebar como drawer ───────────────── */
   @media (max-width: 767px) {
     .admin-sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
+      position: fixed !important;
+      top: 0; left: 0;
       height: 100dvh;
-      width: var(--sidebar-w) !important;  /* ignorar colapso en móvil */
+      width: var(--sidebar-w) !important;
       transform: translateX(-100%);
-      transition: transform 0.25s ease;
+      transition: transform 0.25s ease !important;
       z-index: 300;
-      box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.45);
+      overflow-y: auto;
     }
     .admin-sidebar.mobile-open {
-      transform: translateX(0);
+      transform: translateX(0) !important;
     }
-    .sidebar-toggle {
-      display: none; /* en móvil se usa el hamburger del topbar */
+    /* En móvil NUNCA ocultar los textos, independientemente de sidebar-collapsed */
+    .admin-sidebar .sidebar-link > span {
+      display: inline !important;
     }
-    .sidebar-collapsed .sidebar-link span,
-    .sidebar-collapsed .sidebar-logo img,
-    .sidebar-collapsed .sidebar-logo-text {
-      opacity: 1;
-      pointer-events: auto;
-      width: auto;
+    .admin-sidebar .sidebar-link {
+      justify-content: flex-start !important;
+      padding-inline: revert !important;
     }
-    .sidebar-collapsed .sidebar-link {
-      justify-content: flex-start;
-      padding-inline: revert;
-    }
-    .sidebar-collapsed .sidebar-icon {
-      margin: 0;
-    }
-
-    /* Overlay oscuro al abrir sidebar en móvil */
-    .sidebar-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 299;
-    }
-    .sidebar-overlay.visible {
-      display: block;
+    .admin-sidebar .sidebar-logo img {
+      max-width: none !important;
     }
   }
 
-  /* ── Admin-main: ocupa el resto del espacio ───────────── */
+  /* Overlay oscuro (móvil) */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 299;
+  }
+  .sidebar-overlay.visible { display: block; }
+
+  /* ── Admin-main ────────────────────────────── */
   .admin-main {
     flex: 1;
-    min-width: 0;           /* crucial: permite que flex child se encoja */
+    min-width: 0;    /* permite que el flex-child se encoja */
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    max-width: 100%; /* no desborda */
   }
 
-  /* ── Topbar ────────────────────────────────────────────── */
+  /* ── Topbar ───────────────────────────────── */
   .admin-topbar {
     display: flex;
     align-items: center;
@@ -178,13 +172,13 @@ try {
     flex-shrink: 0;
   }
 
-  /* Botón hamburger (solo móvil) */
+  /* Hamburger (solo móvil) */
   .btn-hamburger {
     display: none;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border: none;
     background: transparent;
     color: var(--color-text-muted, #aaa);
@@ -197,30 +191,16 @@ try {
     .btn-hamburger { display: flex; }
   }
 
-  /* ── Contenido: scroll horizontal en tablas ───────────── */
+  /* ── Contenido: scroll horizontal ─────────────── */
   .admin-content {
     flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
-  }
-  /* Tablas y wrappers anchos pueden hacer scroll horizontal */
-  .table-responsive {
-    overflow-x: auto;
+    overflow-x: auto;          /* SCROLL HORIZONTAL aquí */
     -webkit-overflow-scrolling: touch;
   }
-  /* Aplicar automáticamente a todas las tablas dentro de admin-content */
+  /* Tablas con ancho mínimo para no aplastarse */
   .admin-content table {
-    min-width: 480px; /* evita que colapsen demasiado */
-  }
-  /* Envuelve las tablas que no tengan .table-responsive con scroll */
-  .admin-content > * {
-    /* los hijos directos pueden desbordarse; el contenedor hace scroll */
-  }
-  /* Wrapper general de páginas admin que no usan .table-responsive explícito */
-  .admin-page {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2rem;
+    min-width: 480px;
   }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -234,7 +214,7 @@ try {
 
 <div class="admin-layout">
   <aside class="admin-sidebar" id="admin-sidebar">
-    <!-- Botón colapsar (desktop) -->
+    <!-- Botón colapsar (solo desktop) -->
     <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Colapsar menú">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
