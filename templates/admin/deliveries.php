@@ -2,6 +2,59 @@
 $metaTitle = 'Entregas';
 include BASE_PATH . '/templates/admin/layout_admin.php';
 ?>
+
+<?php
+// URLs y token CSRF para JS — se inyectan antes de cualquier botón
+$csrfToken  = Csrf::token();
+$baseUrl    = BASE_URL;
+?>
+<script>
+/* ---- Entregas: funciones globales ---- */
+window.openDeliveryModal = function(d) {
+  var m = document.getElementById('delivery-modal');
+  if (!m) return;
+  document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
+  document.getElementById('d-id').value      = d ? d.id : '';
+  document.getElementById('d-title').value   = d ? d.title : '';
+  document.getElementById('d-desc').value    = d ? (d.description || '') : '';
+  document.getElementById('d-price').value   = d ? d.price : '0';
+  document.getElementById('d-order').value   = d ? d.sort_order : '0';
+  var courseEl = document.getElementById('d-course');
+  if (d && d.course_id) courseEl.value = d.course_id; else courseEl.value = '';
+  var typeEl = document.getElementById('d-type');
+  if (d && d.type) typeEl.value = d.type;
+  var payEl = document.getElementById('d-payment');
+  if (d && d.payment_type) payEl.value = d.payment_type;
+  document.getElementById('d-notify-email').checked = d ? d.notify_email == 1 : false;
+  document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
+  document.getElementById('d-active').checked       = d ? d.active == 1 : true;
+  m.style.display = 'flex';
+};
+
+window.loadEnrolled = function(deliveryId) {
+  document.getElementById('enrolled-modal').style.display = 'flex';
+  document.getElementById('enrolled-list').innerHTML = '<p style="padding:1rem">Cargando…</p>';
+  fetch('<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/inscritos')
+    .then(function(r){ return r.json(); })
+    .then(function(rows) {
+      if (!rows.length) {
+        document.getElementById('enrolled-list').innerHTML = '<p style="padding:1rem">Sin inscritos.</p>';
+        return;
+      }
+      var html = '<table class="data-table"><thead><tr><th>Alumno</th><th>Email</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td>';
+        html += '<td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
+        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\u00bfDar de baja?\')">'
+              + '<input type="hidden" name="_csrf" value="<?= $csrfToken ?>">'
+              + '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('enrolled-list').innerHTML = html;
+    });
+};
+</script>
+
 <div class="section-header">
   <h1>Gestión de Entregas</h1>
   <button class="btn btn-primary" onclick="openDeliveryModal(null)">+ Nueva entrega</button>
@@ -118,49 +171,5 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
     </form>
   </div>
 </div>
-
-<script>
-window.openDeliveryModal = function(d) {
-  var m = document.getElementById('delivery-modal');
-  document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
-  document.getElementById('d-id').value      = d ? d.id : '';
-  document.getElementById('d-title').value   = d ? d.title : '';
-  document.getElementById('d-desc').value    = d ? (d.description || '') : '';
-  document.getElementById('d-price').value   = d ? d.price : '0';
-  document.getElementById('d-order').value   = d ? d.sort_order : '0';
-  var courseEl = document.getElementById('d-course');
-  if (d && d.course_id) courseEl.value = d.course_id; else courseEl.value = '';
-  var typeEl = document.getElementById('d-type');
-  if (d && d.type) typeEl.value = d.type;
-  var payEl = document.getElementById('d-payment');
-  if (d && d.payment_type) payEl.value = d.payment_type;
-  document.getElementById('d-notify-email').checked = d ? d.notify_email == 1 : false;
-  document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
-  document.getElementById('d-active').checked       = d ? d.active == 1 : true;
-  m.style.display = 'flex';
-};
-
-window.loadEnrolled = function(deliveryId) {
-  document.getElementById('enrolled-modal').style.display = 'flex';
-  document.getElementById('enrolled-list').innerHTML = '<p style="padding:var(--space-4)">Cargando…</p>';
-  fetch('<?= BASE_URL ?>/admin/entregas/' + deliveryId + '/inscritos')
-    .then(r => r.json())
-    .then(rows => {
-      if (!rows.length) {
-        document.getElementById('enrolled-list').innerHTML = '<p style="padding:var(--space-4)">Sin inscritos.</p>';
-        return;
-      }
-      var html = '<table class="data-table"><thead><tr><th>Alumno</th><th>Email</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>';
-      rows.forEach(function(r) {
-        html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td><td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
-        html += '<td><form method="POST" action="<?= BASE_URL ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\\u00bfDar de baja?\')">';
-        html += '<input type="hidden" name="_csrf" value="<?= Csrf::token() ?>">';
-        html += '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
-      });
-      html += '</tbody></table>';
-      document.getElementById('enrolled-list').innerHTML = html;
-    });
-};
-</script>
 
 <?php include BASE_PATH . '/templates/admin/layout_admin_close.php'; ?>
