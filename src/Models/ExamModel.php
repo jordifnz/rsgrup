@@ -31,6 +31,78 @@ class ExamModel
         ) ?: null;
     }
 
+    // ── Disponibilidad del examen ──────────────────────────────────────────
+    /**
+     * Devuelve true si los exámenes están disponibles ahora mismo.
+     *
+     * Modos configurables (clave exam_schedule en rsgrup_settings):
+     *   - last_saturday  → solo el último sábado de cada mes (por defecto)
+     *   - always         → siempre accesible
+     *   - custom_days    → solo los días de la semana en exam_custom_days
+     *                      (cadena con números 0=dom…6=sáb separados por coma)
+     *
+     * @return array{available: bool, reason: string, next: string|null}
+     */
+    public static function isAvailable(): array
+    {
+        $schedule   = Database::fetchColumn("SELECT value FROM rsgrup_settings WHERE `key`='exam_schedule'") ?: 'last_saturday';
+        $customDays = Database::fetchColumn("SELECT value FROM rsgrup_settings WHERE `key`='exam_custom_days'") ?: '';
+
+        if ($schedule === 'always') {
+            return ['available' => true, 'reason' => '', 'next' => null];
+        }
+
+        $now     = new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid'));
+        $today   = (int)$now->format('w'); // 0=dom, 6=sáb
+        $dayNum  = (int)$now->format('j');
+        $month   = (int)$now->format('n');
+        $year    = (int)$now->format('Y');
+
+        if ($schedule === 'last_saturday') {
+            // Último sábado del mes = último día del mes en que format('w')===6
+            $lastDay     = (int)(new DateTimeImmutable("last day of {$year}-{$month}-01"))->format('j');
+            $lastSatDay  = $lastDay;
+            while ((int)(new DateTimeImmutable("{$year}-{$month}-{$lastSatDay}"))->format('w') !== 6) {
+                $lastSatDay--;
+            }
+            $available = ($dayNum === $lastSatDay);
+            if ($available) {
+                return ['available' => true, 'reason' => '', 'next' => null];
+            }
+            // Calcular próximo último sábado
+            $nextMonth  = $month === 12 ? 1  : $month + 1;
+            $nextYear   = $month === 12 ? $year + 1 : $year;
+            $nlastDay   = (int)(new DateTimeImmutable("last day of {$nextYear}-{$nextMonth}-01"))->format('j');
+            $nlastSat   = $nlastDay;
+            while ((int)(new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('w') !== 6) {
+                $nlastSat--;
+            }
+            $nextDate = (new DateTimeImmutable("{$nextYear}-{$nextMonth}-{$nlastSat}"))->format('d/m/Y');
+            return [
+                'available' => false,
+                'reason'    => 'Los exámenes solo están disponibles el último sábado de cada mes.',
+                'next'      => $nextDate,
+            ];
+        }
+
+        if ($schedule === 'custom_days') {
+            $allowed = array_filter(array_map('intval', explode(',', $customDays)), fn($d) => $d >= 0 && $d <= 6);
+            if (in_array($today, $allowed, true)) {
+                return ['available' => true, 'reason' => '', 'next' => null];
+            }
+            $names = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+            $dayNames = implode(', ', array_map(fn($d) => $names[$d], $allowed));
+            return [
+                'available' => false,
+                'reason'    => 'Los exámenes solo están disponibles los días: ' . $dayNames . '.',
+                'next'      => null,
+            ];
+        }
+
+        // Fallback: siempre disponible
+        return ['available' => true, 'reason' => '', 'next' => null];
+    }
+
     /**
      * Evaluate submitted answers against correct answers.
      * Returns score as percentage (0-100).

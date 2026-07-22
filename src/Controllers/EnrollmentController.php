@@ -30,11 +30,13 @@ class EnrollmentController
         }
 
         // Examen y último intento (solo si inscrito)
-        $exam    = null;
-        $attempt = null;
+        $exam          = null;
+        $attempt       = null;
+        $examAvailable = ['available' => true, 'reason' => '', 'next' => null];
         if ($isEnrolled && $delivery['exam_id']) {
-            $exam    = ExamModel::findWithQuestions((int)$delivery['exam_id']);
-            $attempt = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
+            $exam          = ExamModel::findWithQuestions((int)$delivery['exam_id']);
+            $attempt       = ExamModel::getLastAttempt($userId, (int)$delivery['exam_id']);
+            $examAvailable = ExamModel::isAvailable();
         }
 
         $metaTitle = htmlspecialchars($delivery['title']);
@@ -226,6 +228,15 @@ class EnrollmentController
         $enrollment = DeliveryModel::getEnrollment($userId, (int)$delivery['id']);
         if (!$enrollment || $enrollment['status'] !== 'active') {
             http_response_code(403); exit;
+        }
+
+        // Verificar ventana de disponibilidad del examen
+        $avail = ExamModel::isAvailable();
+        if (!$avail['available']) {
+            $_SESSION['flash_error'] = $avail['reason']
+                . ($avail['next'] ? ' Próxima fecha: ' . $avail['next'] . '.' : '');
+            header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
+            exit;
         }
 
         if (ExamModel::getLastAttempt($userId, $examId)) {
