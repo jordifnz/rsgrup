@@ -5,13 +5,11 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 
 <?php $csrfToken = Csrf::generate(); $baseUrl = BASE_URL; ?>
 <script>
-// Helper: selecciona un <select> por value de forma robusta
 function setSelectValue(el, val) {
   var v = (val === null || val === undefined) ? '' : String(val);
   for (var i = 0; i < el.options.length; i++) {
     el.options[i].selected = (el.options[i].value === v);
   }
-  // Si ninguna opción coincide, seleccionar la primera
   if (el.selectedIndex === -1 && el.options.length > 0) el.selectedIndex = 0;
 }
 
@@ -26,7 +24,11 @@ window.openDeliveryModal = function(d) {
 
   setSelectValue(document.getElementById('d-course'),  d ? (d.course_id    || '') : '');
   setSelectValue(document.getElementById('d-type'),    d ? (d.type         || 'entrega') : 'entrega');
-  setSelectValue(document.getElementById('d-payment'), d ? (d.payment_type || 'online')  : 'online');
+
+  // Pago: actualiza tanto el <select> visual como el <input type="hidden">
+  var payVal = d ? (d.payment_type || 'online') : 'online';
+  setSelectValue(document.getElementById('d-payment-select'), payVal);
+  document.getElementById('d-payment').value = payVal;
 
   document.getElementById('d-notify-email').checked = d ? d.notify_email    == 1 : false;
   document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
@@ -50,9 +52,20 @@ window.closeDeliveryModal = function() {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Mantener el hidden sincronizado cuando el usuario cambia el select visualmente
+  var paySelect = document.getElementById('d-payment-select');
+  if (paySelect) {
+    paySelect.addEventListener('change', function() {
+      document.getElementById('d-payment').value = this.value;
+    });
+  }
+
   var form = document.getElementById('delivery-form');
   if (form) {
     form.addEventListener('submit', function() {
+      // Última sincronización justo antes de enviar (por si acaso)
+      var sel = document.getElementById('d-payment-select');
+      if (sel) document.getElementById('d-payment').value = sel.value;
       if (window.tinymce && tinymce.get('d-desc')) {
         tinymce.get('d-desc').save();
       }
@@ -176,6 +189,8 @@ $typeLabels = [
     <form action="<?= BASE_URL ?>/admin/entregas/guardar" method="POST" id="delivery-form">
       <?= Csrf::field() ?>
       <input type="hidden" name="id" id="d-id" value="">
+      {{!-- Campo hidden que SIEMPRE se envía con el valor de pago correcto --}}
+      <input type="hidden" name="payment_type" id="d-payment" value="online">
       <div class="form-grid">
         <div class="form-group form-group--full">
           <label>Título *</label>
@@ -205,7 +220,8 @@ $typeLabels = [
         </div>
         <div class="form-group">
           <label>Pago</label>
-          <select name="payment_type" id="d-payment">
+          {{!-- Select SOLO visual, sin name. El hidden d-payment es el que se envía --}}
+          <select id="d-payment-select">
             <option value="online">Online (PayPal)</option>
             <option value="presencial">Presencial</option>
             <option value="gratis">Gratis</option>
