@@ -2,7 +2,7 @@
 /** @var array $delivery */
 /** @var array $check  — ['ok' => bool, 'reason' => string] */
 include BASE_PATH . '/templates/layouts/base.php';
-$isGratis = ($delivery['payment_type'] ?? '') === 'gratis';
+$isGratis   = ($delivery['payment_type'] ?? '') === 'gratis';
 $isPractica = $delivery['type'] === 'practica';
 ?>
 <div class="page-container" style="max-width:640px;margin:var(--space-12) auto;padding:0 var(--space-4)">
@@ -34,10 +34,10 @@ $isPractica = $delivery['type'] === 'practica';
     <!-- Precio -->
     <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-6)">
       <?php if ($isGratis): ?>
-        <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">Gratuito</span>
+        <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">Sin Coste</span>
       <?php else: ?>
         <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-text)">
-          <?= number_format((float)($delivery['price'] ?? 0), 2, ',', '.') ?> €
+          <?= number_format((float)($delivery['price'] ?? 0), 2, ',', '.') ?> &euro;
         </span>
         <?php if ($isPractica): ?>
           <span style="font-size:var(--text-sm);color:var(--color-text-muted)">(pago presencial)</span>
@@ -59,7 +59,7 @@ $isPractica = $delivery['type'] === 'practica';
       <!-- Puede inscribirse -->
       <?php if ($isGratis): ?>
         <p style="margin-bottom:var(--space-4);font-size:var(--text-sm);color:var(--color-text-muted)">
-          Esta entrega es gratuita. Al confirmar quedarás inscrito de inmediato.
+          Esta entrega es sin coste. Al confirmar quedarás inscrito de inmediato.
         </p>
       <?php elseif ($isPractica): ?>
         <p style="margin-bottom:var(--space-4);font-size:var(--text-sm);color:var(--color-text-muted)">
