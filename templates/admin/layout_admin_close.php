@@ -70,16 +70,30 @@
     });
   }
 
-  // ── Iconos Lucide + flash messages ────────────────────
-  document.addEventListener('DOMContentLoaded', function(){
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    document.querySelectorAll('.flash').forEach(function(el){
-      setTimeout(function(){
-        el.style.transition='opacity 0.4s'; el.style.opacity='0';
-        setTimeout(function(){ el.remove(); }, 420);
-      }, 3000);
-    });
+  // ── Iconos Lucide ──────────────────────────────────────
+  // Se llama directamente (sin DOMContentLoaded) porque este script
+  // se ejecuta al final del body y el DOM ya está construido.
+  // Lucide se carga sin defer, así que está disponible aquí.
+  function initLucide() {
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    } else {
+      // Fallback: si por algún motivo aún no cargó, esperar al load
+      window.addEventListener('load', function() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      });
+    }
+  }
+  initLucide();
+
+  // ── Flash messages ─────────────────────────────────────
+  document.querySelectorAll('.flash').forEach(function(el){
+    setTimeout(function(){
+      el.style.transition='opacity 0.4s'; el.style.opacity='0';
+      setTimeout(function(){ el.remove(); }, 420);
+    }, 3000);
   });
+
 })();
 </script>
 </body>

@@ -184,11 +184,39 @@ $accentColor = Database::getSetting('brand_accent_color', '#e87722');
   .admin-content table {
     min-width: 480px;
   }
+
+  /* ── Modal scroll fix ────────────────────────────────────
+     El overlay ocupa toda la pantalla y centra el modal-box.
+     El modal-box tiene max-height para que en pantallas
+     pequeñas sea scrollable y el botón Guardar siempre sea
+     alcanzable. */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    padding: var(--space-4, 1rem);
+    overflow-y: auto;        /* fallback si el box supera la pantalla */
+  }
+  .modal-box {
+    position: relative;
+    width: 100%;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-lg, 0.75rem);
+    background: var(--color-surface, #1c1b19);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
 </style>
+<!-- Lucide SIN defer para que esté disponible cuando el script al final del body lo invoque -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
