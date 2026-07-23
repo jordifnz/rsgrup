@@ -86,7 +86,7 @@ window.loadEnrolled = function(deliveryId) {
 <table class="data-table">
   <thead>
     <tr>
-      <th>Orden</th><th>Título</th><th>Curso</th><th>Tipo</th>
+      <th>Orden</th><th>Título</th><th>Curso</th><th>Tipo</th><th>Pago</th>
       <th>Temas</th><th>Inscritos</th><th>Precio</th>
       <th>Activa</th><th>WhatsApp</th><th>Email</th>
       <th>Acciones</th>
@@ -99,12 +99,19 @@ window.loadEnrolled = function(deliveryId) {
     <td><?= htmlspecialchars($d['title']) ?></td>
     <td><?= htmlspecialchars($d['course_title'] ?? '—') ?></td>
     <td><span class="badge"><?= htmlspecialchars($d['type']) ?></span></td>
+    <td><span class="badge"><?= htmlspecialchars($d['payment_type'] ?? '—') ?></span></td>
     <td><?= (int)($d['topic_count'] ?? 0) ?></td>
     <td>
       <?= (int)($d['enrolled_count'] ?? 0) ?>
       <button type="button" class="btn btn-sm" onclick="loadEnrolled(<?= $d['id'] ?>)">Ver</button>
     </td>
-    <td><?= number_format((float)$d['price'], 2) ?> €</td>
+    <td>
+      <?php if (($d['payment_type'] ?? '') === 'gratis'): ?>
+        <span style="color:var(--color-success);font-weight:600">Gratis</span>
+      <?php else: ?>
+        <?= number_format((float)$d['price'], 2) ?> €
+      <?php endif; ?>
+    </td>
     <td style="text-align:center"><?= $d['active']           ? '✅' : '❌' ?></td>
     <td style="text-align:center"><?= $d['notify_whatsapp']  ? '✅' : '❌' ?></td>
     <td style="text-align:center"><?= $d['notify_email']     ? '✅' : '❌' ?></td>
@@ -174,6 +181,7 @@ window.loadEnrolled = function(deliveryId) {
           <select name="payment_type" id="d-payment">
             <option value="online">Online (PayPal)</option>
             <option value="presencial">Presencial</option>
+            <option value="gratis">Gratis</option>
           </select>
         </div>
         <div class="form-group">

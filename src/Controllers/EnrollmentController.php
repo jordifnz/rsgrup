@@ -120,11 +120,15 @@ class EnrollmentController
             exit;
         }
 
-        if ($delivery['type'] === 'practica') {
+        // Inscripción directa: práctica (pago presencial) o gratis
+        if ($delivery['payment_type'] === 'gratis' || $delivery['type'] === 'practica') {
             DeliveryModel::createEnrollment($userId, $deliveryId, null, 'active');
-            ActivityLogger::log($userId, 'enrollment', 'Inscripción práctica: ' . $delivery['title']);
+            ActivityLogger::log($userId, 'enrollment', 'Inscripción directa: ' . $delivery['title']);
             NotificationService::send($userId, $delivery);
-            $_SESSION['flash_success'] = 'Inscrito correctamente. El pago se realizará presencialmente.';
+            $msg = $delivery['payment_type'] === 'gratis'
+                ? '¡Inscrito correctamente! Ya puedes acceder al contenido.'
+                : 'Inscrito correctamente. El pago se realizará presencialmente.';
+            $_SESSION['flash_success'] = $msg;
             header('Location: ' . BASE_URL . '/entrega/' . $delivery['slug']);
             exit;
         }

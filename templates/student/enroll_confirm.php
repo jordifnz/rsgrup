@@ -2,6 +2,8 @@
 /** @var array $delivery */
 /** @var array $check  — ['ok' => bool, 'reason' => string] */
 include BASE_PATH . '/templates/layouts/base.php';
+$isGratis = ($delivery['payment_type'] ?? '') === 'gratis';
+$isPractica = $delivery['type'] === 'practica';
 ?>
 <div class="page-container" style="max-width:640px;margin:var(--space-12) auto;padding:0 var(--space-4)">
 
@@ -31,11 +33,15 @@ include BASE_PATH . '/templates/layouts/base.php';
 
     <!-- Precio -->
     <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-6)">
-      <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-text)">
-        <?= number_format((float)($delivery['price'] ?? 0), 2, ',', '.') ?> €
-      </span>
-      <?php if ($delivery['type'] === 'practica'): ?>
-        <span style="font-size:var(--text-sm);color:var(--color-text-muted)">(pago presencial)</span>
+      <?php if ($isGratis): ?>
+        <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">Gratuito</span>
+      <?php else: ?>
+        <span style="font-size:var(--text-xl);font-weight:700;color:var(--color-text)">
+          <?= number_format((float)($delivery['price'] ?? 0), 2, ',', '.') ?> €
+        </span>
+        <?php if ($isPractica): ?>
+          <span style="font-size:var(--text-sm);color:var(--color-text-muted)">(pago presencial)</span>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
 
@@ -51,7 +57,11 @@ include BASE_PATH . '/templates/layouts/base.php';
 
     <?php else: ?>
       <!-- Puede inscribirse -->
-      <?php if ($delivery['type'] === 'practica'): ?>
+      <?php if ($isGratis): ?>
+        <p style="margin-bottom:var(--space-4);font-size:var(--text-sm);color:var(--color-text-muted)">
+          Esta entrega es gratuita. Al confirmar quedarás inscrito de inmediato.
+        </p>
+      <?php elseif ($isPractica): ?>
         <p style="margin-bottom:var(--space-4);font-size:var(--text-sm);color:var(--color-text-muted)">
           Esta práctica tiene pago presencial. Al confirmar quedarás inscrito y realizarás el pago en persona.
         </p>
@@ -65,9 +75,11 @@ include BASE_PATH . '/templates/layouts/base.php';
         <?= Csrf::field() ?>
         <input type="hidden" name="delivery_id" value="<?= (int)$delivery['id'] ?>">
         <button type="submit" class="btn btn-primary" style="width:100%">
-          <?= $delivery['type'] === 'practica'
-              ? 'Confirmar inscripción'
-              : 'Confirmar e ir a PayPal' ?>
+          <?php if ($isGratis || $isPractica): ?>
+            Confirmar inscripción
+          <?php else: ?>
+            Confirmar e ir a PayPal
+          <?php endif; ?>
         </button>
       </form>
 
