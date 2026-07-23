@@ -9,6 +9,29 @@ class AdminController
         requireAdmin();
     }
 
+    /**
+     * Ejecuta migraciones pendientes marcadas en rsgrup_settings.
+     * Seguro de llamar en cada request: solo actúa si la flag no existe.
+     */
+    private function runPendingMigrations(): void
+    {
+        // Migración 003: sanear payment_type vacío/NULL
+        $done = Database::fetchColumn(
+            "SELECT value FROM rsgrup_settings WHERE `key` = 'migration_003_done'"
+        );
+        if (!$done) {
+            Database::execute(
+                "UPDATE rsgrup_deliveries
+                 SET payment_type = CASE WHEN price = 0 THEN 'gratis' ELSE 'online' END
+                 WHERE payment_type IS NULL OR payment_type = ''"
+            );
+            Database::execute(
+                "INSERT INTO rsgrup_settings (`key`, `value`) VALUES ('migration_003_done', '1')
+                 ON DUPLICATE KEY UPDATE `value` = '1'"
+            );
+        }
+    }
+
     // ── Dashboard ───────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
@@ -68,6 +91,7 @@ class AdminController
     public function deliveries(array $params = []): void
     {
         $this->boot();
+        $this->runPendingMigrations();
         try {
             $deliveries = Database::fetchAll(
                 'SELECT d.*,
@@ -145,7 +169,6 @@ class AdminController
         $courseId    = Sanitize::int($_POST['course_id'] ?? 0);
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
-        // 'videollamada' añadido como tipo válido
         $validTypes  = ['matricula', 'entrega', 'practica', 'videollamada'];
         $type        = in_array($_POST['type'] ?? '', $validTypes)
                            ? $_POST['type'] : 'entrega';
@@ -213,7 +236,6 @@ class AdminController
             error_log('[RSGrup] topics query error: ' . $e->getMessage());
             $topics = [];
         }
-        // Añadir adjuntos a cada tema
         foreach ($topics as &$t) {
             $t['_attachments'] = TopicModel::attachmentsForTopic((int)$t['id']);
         }
@@ -272,7 +294,6 @@ class AdminController
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
         $active      = isset($_POST['active']) ? 1 : 0;
 
-        // ── PDF principal ────────────────────────────────────────────
         $pdfFile = $id ? (Database::fetchColumn('SELECT pdf_file FROM rsgrup_topics WHERE id=?', [$id]) ?: null) : null;
         if (!empty($_FILES['pdf_file']['tmp_name'])) {
             $ext = strtolower(pathinfo($_FILES['pdf_file']['name'], PATHINFO_EXTENSION));
@@ -285,7 +306,6 @@ class AdminController
             }
         }
 
-        // ── Guardar/actualizar tema ────────────────────────────────────
         if ($id) {
             TopicModel::update($id, [
                 'delivery_id'  => $deliveryId,
@@ -308,7 +328,6 @@ class AdminController
             ]);
         }
 
-        // ── Adjuntos adicionales: borrar los marcados ─────────────────────
         $toDelete = isset($_POST['delete_attachment']) && is_array($_POST['delete_attachment'])
             ? array_map('intval', $_POST['delete_attachment']) : [];
         foreach ($toDelete as $attId) {
@@ -321,31 +340,23 @@ class AdminController
             }
         }
 
-        // ── Adjuntos adicionales: subir nuevos ────────────────────────────
         if (!empty($_FILES['attachments']['tmp_name'])) {
             $attDir = BASE_PATH . '/private_files/attachments';
             if (!is_dir($attDir)) mkdir($attDir, 0755, true);
-
-            $files       = $_FILES['attachments'];
-            $descs       = isset($_POST['attachment_desc']) && is_array($_POST['attachment_desc'])
-                            ? $_POST['attachment_desc'] : [];
-            $count       = is_array($files['tmp_name']) ? count($files['tmp_name']) : 1;
-
+            $files  = $_FILES['attachments'];
+            $descs  = isset($_POST['attachment_desc']) && is_array($_POST['attachment_desc'])
+                        ? $_POST['attachment_desc'] : [];
+            $count  = is_array($files['tmp_name']) ? count($files['tmp_name']) : 1;
             for ($i = 0; $i < $count; $i++) {
                 $tmpName  = is_array($files['tmp_name'])  ? $files['tmp_name'][$i]  : $files['tmp_name'];
                 $origName = is_array($files['name'])      ? $files['name'][$i]      : $files['name'];
                 $error    = is_array($files['error'])     ? $files['error'][$i]     : $files['error'];
                 if ($error !== UPLOAD_ERR_OK || empty($tmpName)) continue;
-
-                // Tipos permitidos
                 $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
                 $allowed = ['pdf','doc','docx','xls','xlsx','ppt','pptx','zip','rar','jpg','jpeg','png','gif','mp4','mp3'];
                 if (!in_array($ext, $allowed)) continue;
-
                 $filename = $this->attachmentFilename($origName, $attDir);
                 move_uploaded_file($tmpName, $attDir . '/' . $filename);
-
-                // Permitir HTML en la descripción del adjunto
                 $desc = Sanitize::html($descs[$i] ?? '');
                 Database::execute(
                     'INSERT INTO rsgrup_topic_attachments (topic_id, filename, original_name, description, sort_order, created_at)
@@ -360,7 +371,6 @@ class AdminController
         exit;
     }
 
-    /** Eliminar un adjunto individual vía AJAX o redirect */
     public function deleteTopicAttachment(array $params = []): void
     {
         $this->boot();
