@@ -148,7 +148,9 @@ class AdminController
         $type        = in_array($_POST['type'] ?? '', ['matricula', 'entrega', 'practica'])
                            ? $_POST['type'] : 'entrega';
         $price       = Sanitize::float($_POST['price'] ?? 0);
-        $paymentType = ($_POST['payment_type'] ?? 'online') === 'presencial' ? 'presencial' : 'online';
+        $validPayments = ['online', 'presencial', 'gratis'];
+        $paymentType = in_array($_POST['payment_type'] ?? '', $validPayments)
+                           ? $_POST['payment_type'] : 'online';
         $sortOrder   = Sanitize::int($_POST['sort_order'] ?? 0);
         $notifyEmail = isset($_POST['notify_email'])    ? 1 : 0;
         $notifyWa    = isset($_POST['notify_whatsapp']) ? 1 : 0;
