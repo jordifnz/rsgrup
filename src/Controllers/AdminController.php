@@ -9,7 +9,7 @@ class AdminController
         requireAdmin();
     }
 
-    // ── Dashboard ─────────────────────────────────────────────────────
+    // ── Dashboard ───────────────────────────────────────────────────
     public function dashboard(array $params = []): void
     {
         $this->boot();
@@ -29,7 +29,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/dashboard.php';
     }
 
-    // ── Courses ──────────────────────────────────────────────────────
+    // ── Courses ──────────────────────────────────────────────
     public function courses(array $params = []): void
     {
         $this->boot();
@@ -64,7 +64,7 @@ class AdminController
         exit;
     }
 
-    // ── Entregas ──────────────────────────────────────────────────────
+    // ── Entregas ──────────────────────────────────────────────
     public function deliveries(array $params = []): void
     {
         $this->boot();
@@ -145,7 +145,9 @@ class AdminController
         $courseId    = Sanitize::int($_POST['course_id'] ?? 0);
         $title       = Sanitize::string($_POST['title'] ?? '');
         $description = Sanitize::html($_POST['description'] ?? '');
-        $type        = in_array($_POST['type'] ?? '', ['matricula', 'entrega', 'practica'])
+        // 'videollamada' añadido como tipo válido
+        $validTypes  = ['matricula', 'entrega', 'practica', 'videollamada'];
+        $type        = in_array($_POST['type'] ?? '', $validTypes)
                            ? $_POST['type'] : 'entrega';
         $price       = Sanitize::float($_POST['price'] ?? 0);
         $validPayments = ['online', 'presencial', 'gratis'];
@@ -193,7 +195,7 @@ class AdminController
         exit;
     }
 
-    // ── Temas ─────────────────────────────────────────────────────────
+    // ── Temas ─────────────────────────────────────────────────
     public function topics(array $params = []): void
     {
         $this->boot();
@@ -283,7 +285,7 @@ class AdminController
             }
         }
 
-        // ── Guardar/actualizar tema ──────────────────────────────────
+        // ── Guardar/actualizar tema ────────────────────────────────────
         if ($id) {
             TopicModel::update($id, [
                 'delivery_id'  => $deliveryId,
@@ -306,7 +308,7 @@ class AdminController
             ]);
         }
 
-        // ── Adjuntos adicionales: borrar los marcados ─────────────────
+        // ── Adjuntos adicionales: borrar los marcados ─────────────────────
         $toDelete = isset($_POST['delete_attachment']) && is_array($_POST['delete_attachment'])
             ? array_map('intval', $_POST['delete_attachment']) : [];
         foreach ($toDelete as $attId) {
@@ -319,7 +321,7 @@ class AdminController
             }
         }
 
-        // ── Adjuntos adicionales: subir nuevos ────────────────────────
+        // ── Adjuntos adicionales: subir nuevos ────────────────────────────
         if (!empty($_FILES['attachments']['tmp_name'])) {
             $attDir = BASE_PATH . '/private_files/attachments';
             if (!is_dir($attDir)) mkdir($attDir, 0755, true);
@@ -387,7 +389,7 @@ class AdminController
         exit;
     }
 
-    // ── Exams ─────────────────────────────────────────────────────────
+    // ── Exams ─────────────────────────────────────────────────
     public function exams(array $params = []): void
     {
         $this->boot();
@@ -484,7 +486,7 @@ class AdminController
         exit;
     }
 
-    // ── Users ────────────────────────────────────────────────────────
+    // ── Users ────────────────────────────────────────────────
     public function users(array $params = []): void
     {
         $this->boot();
@@ -585,7 +587,7 @@ class AdminController
         exit;
     }
 
-    // ── Activity ─────────────────────────────────────────────────────
+    // ── Activity ───────────────────────────────────────────────
     public function activity(array $params = []): void
     {
         $this->boot();
@@ -599,7 +601,7 @@ class AdminController
         include BASE_PATH . '/templates/admin/activity.php';
     }
 
-    // ── Settings ─────────────────────────────────────────────────────
+    // ── Settings ───────────────────────────────────────────────
     public function settings(array $params = []): void
     {
         $this->boot();
@@ -670,7 +672,7 @@ class AdminController
         exit;
     }
 
-    // ── API Tokens ───────────────────────────────────────────────────
+    // ── API Tokens ───────────────────────────────────────────────
     public function createApiToken(array $params = []): void
     {
         $this->boot();
@@ -703,7 +705,7 @@ class AdminController
     public function createToken(array $params = []): void { $this->createApiToken($params); }
     public function deleteToken(array $params = []): void  { $this->deleteApiToken($params); }
 
-    // ── Títulos: impresión masiva ─────────────────────────────────────
+    // ── Títulos: impresión masiva ───────────────────────────────────────────
     public function titlesBulk(array $params = []): void
     {
         $this->boot();

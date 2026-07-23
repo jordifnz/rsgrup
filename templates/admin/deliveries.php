@@ -68,7 +68,7 @@ window.loadEnrolled = function(deliveryId) {
       rows.forEach(function(r) {
         html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td>';
         html += '<td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
-        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'¿Dar de baja?\')">'
+        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\u00bfDar de baja?\')">'
               + '<input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">'
               + '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
       });
@@ -77,6 +77,22 @@ window.loadEnrolled = function(deliveryId) {
     });
 };
 </script>
+
+<?php
+// Etiquetas legibles para payment_type
+$paymentLabels = [
+    'online'     => 'Online',
+    'presencial' => 'Presencial',
+    'gratis'     => 'Gratis',
+];
+// Etiquetas legibles para type
+$typeLabels = [
+    'entrega'      => 'Entrega',
+    'matricula'    => 'Matrícula',
+    'practica'     => 'Práctica',
+    'videollamada' => 'Videollamada',
+];
+?>
 
 <div class="section-header">
   <h1>Gestión de Entregas</h1>
@@ -98,8 +114,15 @@ window.loadEnrolled = function(deliveryId) {
     <td><?= (int)$d['sort_order'] ?></td>
     <td><?= htmlspecialchars($d['title']) ?></td>
     <td><?= htmlspecialchars($d['course_title'] ?? '—') ?></td>
-    <td><span class="badge"><?= htmlspecialchars($d['type']) ?></span></td>
-    <td><span class="badge"><?= htmlspecialchars($d['payment_type'] ?? '—') ?></span></td>
+    <td><span class="badge"><?= htmlspecialchars($typeLabels[$d['type']] ?? $d['type']) ?></span></td>
+    <td>
+      <?php
+        $pt    = $d['payment_type'] ?? '';
+        $label = $paymentLabels[$pt] ?? ($pt ?: '—');
+        $style = $pt === 'gratis' ? 'background:var(--color-success,#437a22);color:#fff' : '';
+      ?>
+      <span class="badge" style="<?= $style ?>"><?= htmlspecialchars($label) ?></span>
+    </td>
     <td><?= (int)($d['topic_count'] ?? 0) ?></td>
     <td>
       <?= (int)($d['enrolled_count'] ?? 0) ?>
@@ -109,7 +132,7 @@ window.loadEnrolled = function(deliveryId) {
       <?php if (($d['payment_type'] ?? '') === 'gratis'): ?>
         <span style="color:var(--color-success);font-weight:600">Gratis</span>
       <?php else: ?>
-        <?= number_format((float)$d['price'], 2) ?> €
+        <?= number_format((float)$d['price'], 2) ?> &euro;
       <?php endif; ?>
     </td>
     <td style="text-align:center"><?= $d['active']           ? '✅' : '❌' ?></td>
@@ -118,7 +141,7 @@ window.loadEnrolled = function(deliveryId) {
     <td class="actions">
       <button type="button" class="btn btn-sm" onclick="openDeliveryModal(<?= htmlspecialchars(json_encode($d), ENT_QUOTES) ?>)">Editar</button>
       <form action="<?= BASE_URL ?>/admin/entregas/<?= $d['id'] ?>/eliminar" method="POST"
-            style="display:inline" onsubmit="return confirm('¿Eliminar entrega?')">
+            style="display:inline" onsubmit="return confirm('\u00bfEliminar entrega?')">
         <?= Csrf::field() ?>
         <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
       </form>
@@ -173,7 +196,7 @@ window.loadEnrolled = function(deliveryId) {
           </select>
         </div>
         <div class="form-group">
-          <label>Precio (€)</label>
+          <label>Precio (&euro;)</label>
           <input type="number" name="price" id="d-price" step="0.01" value="0">
         </div>
         <div class="form-group">
