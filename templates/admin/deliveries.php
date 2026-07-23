@@ -5,26 +5,34 @@ include BASE_PATH . '/templates/admin/layout_admin.php';
 
 <?php $csrfToken = Csrf::generate(); $baseUrl = BASE_URL; ?>
 <script>
+// Helper: selecciona un <select> por value de forma robusta
+function setSelectValue(el, val) {
+  var v = (val === null || val === undefined) ? '' : String(val);
+  for (var i = 0; i < el.options.length; i++) {
+    el.options[i].selected = (el.options[i].value === v);
+  }
+  // Si ninguna opción coincide, seleccionar la primera
+  if (el.selectedIndex === -1 && el.options.length > 0) el.selectedIndex = 0;
+}
+
 window.openDeliveryModal = function(d) {
   var m = document.getElementById('delivery-modal');
   if (!m) return;
   document.getElementById('delivery-modal-title').textContent = d ? 'Editar Entrega' : 'Nueva Entrega';
-  document.getElementById('d-id').value      = d ? d.id : '';
-  document.getElementById('d-title').value   = d ? d.title : '';
-  document.getElementById('d-price').value   = d ? d.price : '0';
-  document.getElementById('d-order').value   = d ? d.sort_order : '0';
-  var courseEl = document.getElementById('d-course');
-  if (d && d.course_id) courseEl.value = d.course_id; else courseEl.value = '';
-  var typeEl = document.getElementById('d-type');
-  if (d && d.type) typeEl.value = d.type;
-  var payEl = document.getElementById('d-payment');
-  if (d && d.payment_type) payEl.value = d.payment_type;
-  document.getElementById('d-notify-email').checked = d ? d.notify_email == 1 : false;
+  document.getElementById('d-id').value    = d ? d.id    : '';
+  document.getElementById('d-title').value = d ? d.title : '';
+  document.getElementById('d-price').value = d ? d.price : '0';
+  document.getElementById('d-order').value = d ? d.sort_order : '0';
+
+  setSelectValue(document.getElementById('d-course'),  d ? (d.course_id    || '') : '');
+  setSelectValue(document.getElementById('d-type'),    d ? (d.type         || 'entrega') : 'entrega');
+  setSelectValue(document.getElementById('d-payment'), d ? (d.payment_type || 'online')  : 'online');
+
+  document.getElementById('d-notify-email').checked = d ? d.notify_email    == 1 : false;
   document.getElementById('d-notify-wa').checked    = d ? d.notify_whatsapp == 1 : false;
-  document.getElementById('d-active').checked       = d ? d.active == 1 : true;
+  document.getElementById('d-active').checked       = d ? d.active          == 1 : true;
   m.style.display = 'flex';
 
-  // Inicializar TinyMCE (el textarea ya es visible al poner display:flex)
   var descContent = d ? (d.description || '') : '';
   if (typeof initEditorInModal === 'function') {
     initEditorInModal('d-desc', descContent);
@@ -35,14 +43,12 @@ window.openDeliveryModal = function(d) {
 
 window.closeDeliveryModal = function() {
   var m = document.getElementById('delivery-modal');
-  // Destruir instancia TinyMCE antes de ocultar
   if (window.tinymce && tinymce.get('d-desc')) {
     tinymce.get('d-desc').remove();
   }
   if (m) m.style.display = 'none';
 };
 
-// Volcar contenido TinyMCE al textarea antes de enviar el form
 document.addEventListener('DOMContentLoaded', function() {
   var form = document.getElementById('delivery-form');
   if (form) {
@@ -68,7 +74,7 @@ window.loadEnrolled = function(deliveryId) {
       rows.forEach(function(r) {
         html += '<tr><td>' + r.name + ' ' + r.surnames + '</td><td>' + r.email + '</td>';
         html += '<td>' + r.status + '</td><td>' + r.enrolled_at + '</td>';
-        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'\u00bfDar de baja?\')">'
+        html += '<td><form method="POST" action="<?= $baseUrl ?>/admin/entregas/' + deliveryId + '/baja/' + r.enrollment_id + '" onsubmit="return confirm(\'¿Dar de baja?\')">'
               + '<input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">'
               + '<button type="submit" class="btn btn-sm btn-danger">Baja</button></form></td></tr>';
       });
@@ -79,13 +85,11 @@ window.loadEnrolled = function(deliveryId) {
 </script>
 
 <?php
-// Etiquetas legibles para payment_type
 $paymentLabels = [
     'online'     => 'Online',
     'presencial' => 'Presencial',
     'gratis'     => 'Gratis',
 ];
-// Etiquetas legibles para type
 $typeLabels = [
     'entrega'      => 'Entrega',
     'matricula'    => 'Matrícula',
