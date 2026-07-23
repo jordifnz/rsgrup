@@ -98,7 +98,7 @@ window.loadEnrolled = function(deliveryId) {
 $paymentLabels = [
     'online'     => 'Online',
     'presencial' => 'Presencial',
-    'gratis'     => 'Gratis',
+    'gratis'     => 'Sin Coste',
 ];
 $typeLabels = [
     'entrega'      => 'Entrega',
@@ -144,7 +144,7 @@ $typeLabels = [
     </td>
     <td>
       <?php if (($d['payment_type'] ?? '') === 'gratis'): ?>
-        <span style="color:var(--color-success);font-weight:600">Gratis</span>
+        <span style="color:var(--color-success);font-weight:600">Sin Coste</span>
       <?php else: ?>
         <?= number_format((float)$d['price'], 2) ?> &euro;
       <?php endif; ?>
@@ -219,7 +219,7 @@ $typeLabels = [
           <select id="d-payment-select">
             <option value="online">Online (PayPal)</option>
             <option value="presencial">Presencial</option>
-            <option value="gratis">Gratis</option>
+            <option value="gratis">Sin Coste</option>
           </select>
         </div>
         <div class="form-group">
